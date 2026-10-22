@@ -17,8 +17,6 @@ public class AuthUserEntity {
     @Id
     private Long id;
     private String name;
-    private String city;
-    private String address;
     @Column(unique = true,nullable = false)
     private String email;
     private String password;
@@ -31,4 +29,18 @@ public class AuthUserEntity {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @Override
+    public String toString() {
+        return "AuthUserEntity{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", email='" + email + '\'' +
+                ", password='" + password + '\'' +
+                ", phone_no='" + phone_no + '\'' +
+                ", enable=" + enable +
+                ", role=" + role +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
+                '}';
+    }
 }

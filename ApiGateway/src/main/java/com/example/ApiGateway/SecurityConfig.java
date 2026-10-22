@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -15,7 +17,6 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Configuration
-@EnableWebSecurity
 public class SecurityConfig {
     @Autowired
     private JwtFilter jwtFilter;
@@ -26,6 +27,7 @@ public class SecurityConfig {
                 .httpBasic(b->b.disable())
                 .sessionManagement((sm)->sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(req->req.requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/user/profile").permitAll()
                         .requestMatchers("/user/**").hasAnyRole("ADMIN","USER")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
@@ -34,7 +36,7 @@ public class SecurityConfig {
                     response.setStatus(HttpStatus.UNAUTHORIZED.value());
                     response.setContentType("application/json");
                     String message = "Unauthorized: " + authException.getMessage();
-                    String attrError = (String) request.getAttribute("error");
+                    String attrError = request.getAttribute("error")!=null?(String) request.getAttribute("error"):"Authentication fail!";
                     Map<String, String> body = Map.of(
                             "error",attrError,
                             "message", message,
@@ -60,5 +62,9 @@ public class SecurityConfig {
 
         return httpSecurity.build();
 
+    }
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return new InMemoryUserDetailsManager();
     }
 }

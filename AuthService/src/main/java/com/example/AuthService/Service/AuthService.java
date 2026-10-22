@@ -1,6 +1,7 @@
 package com.example.AuthService.Service;
 
 import com.example.AuthService.DTO.LoginResponse;
+import com.example.AuthService.DTO.UserDataSend;
 import com.example.AuthService.DTO.UserLoginRequest;
 import com.example.AuthService.DTO.UserRegistration;
 import com.example.AuthService.Entities.AuthUserEntity;
@@ -9,9 +10,12 @@ import com.example.AuthService.GlobalException.AuthenticationExceptionClass;
 import com.example.AuthService.GlobalException.ConflictException;
 import com.example.AuthService.JwtUtils.JwtService;
 import com.example.AuthService.Repository.AuthRepo;
+import io.lettuce.core.json.JsonArray;
+import io.lettuce.core.json.JsonObject;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tomcat.websocket.AuthenticationException;
@@ -24,6 +28,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.Arrays;
 import java.util.UUID;
@@ -38,6 +44,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CookieService cookieService;
+    private final RestClient restclient;
+    @Transactional
     public UserRegistration register(UserRegistration userRegistration) {
         if(userRegistration.getEmail()==null||userRegistration.getEmail().isBlank()) throw new BadCredentialsException("Please enter mail id!");
         if(userRegistration.getName()==null||userRegistration.getName().isBlank()) throw new BadCredentialsException("Please enter name!");
@@ -51,8 +59,26 @@ public class AuthService {
         u.setPassword(passwordEncoder.encode("dummy123"));
         u.setRole(Role.ROLE_USER);
         u=authRepo.save(u);
-        return new UserRegistration(u.getId(),u.getName(),u.getEmail(),u.getPassword(),u.getPhone_no(),u.getEnable(),u.getRole(),u.getCreatedAt(),u.getUpdatedAt());
+        System.out.println(u);
+        //restClient
+        String s=sendData(u);
+        if(s==null) throw new RuntimeException("Profile is not created for user!");
+        //
+        return new UserRegistration(u.getId(),u.getName(),u.getEmail(),u.getPhone_no(),u.getEnable(),u.getRole(),u.getCreatedAt(),u.getUpdatedAt());
     }
+
+    private String sendData(AuthUserEntity user) {
+        UserDataSend send=new UserDataSend(user.getName(),user.getEmail(),user.getPhone_no());
+        System.out.println(send);
+        String json=new ObjectMapper().writeValueAsString(send);
+        System.out.println("ObjectMapper use\n"+json);
+        return restclient.post()
+                .uri("http://localhost:8083/user/profile")
+                .body(send)
+                .retrieve()
+                .body(String.class);
+    }
+
     public String refreshTokenJti(){
         return UUID.randomUUID().toString();
     }
@@ -72,8 +98,6 @@ public class AuthService {
             String role = jwtService.getRole(details);
             return new LoginResponse(accessToken, refreshToken, details.getUsername(), Role.valueOf(role));
     }
-
-
 
     public LoginResponse refreshToken(String refreshToken, HttpServletRequest request,HttpServletResponse response) {
         String token=readToken(refreshToken,request);

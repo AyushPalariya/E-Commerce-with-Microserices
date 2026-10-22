@@ -10,11 +10,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class UserRegistration {
     private Long id;
-    private String city;
-    private String address;
     private String name;
     private String email;
-    private String password;
     private String phone_no;
     private Boolean enable;
     private Role role;

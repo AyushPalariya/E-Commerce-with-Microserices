@@ -9,6 +9,7 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 
@@ -35,4 +36,8 @@ public class Config {
         return new LettuceConnectionFactory(host,port);
     }
 
+    @Bean
+    public RestClient restclient(){
+        return RestClient.builder().build();
+    }
 }

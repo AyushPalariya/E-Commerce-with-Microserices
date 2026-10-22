@@ -11,6 +11,10 @@ spring:
               uri: lb://AUTHSERVICE
               predicates:
                 - Path=/auth/**
+            - id: USERSERVICE
+              uri: lb://USERSERVICE
+              predicates:
+                - Path=/user/**
 security:
   jwt:
     key: djaijdfnneijrie834382njnefnsdfekwapiwej02393wjnrefejwfnfslaeialewer323nnfioeje33
@@ -19,10 +23,10 @@ security:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://localhost:8081/eureka/
 
 server:
-  port: 6969
+  port: 8080
 
 
   

@@ -9,6 +9,7 @@
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
         <module name="AuthService" />
       </profile>
@@ -18,6 +19,15 @@
         <outputRelativeToContentRoot value="true" />
         <module name="EurekaDiscovery" />
         <module name="ApiGateway" />
+      </profile>
+      <profile name="Annotation profile for UserService" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+        </processorPath>
+        <module name="UserService" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
@@ -30,6 +40,7 @@
       <module name="AuthService" options="-parameters" />
       <module name="EurekaDiscovery" options="-parameters" />
       <module name="UserDemo" options="-parameters" />
+      <module name="UserService" options="-parameters" />
     </option>
   </component>
 </project>

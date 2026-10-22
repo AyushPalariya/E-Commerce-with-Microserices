@@ -26,35 +26,41 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String path=request.getRequestURI();
-        if(path.startsWith("/auth")){
+        if(path.startsWith("/auth")||path.equals("/user/profile")){
             filterChain.doFilter(request,response);
-            System.out.println("auth api passess..");
+            System.out.println("auth api passess.."+path);
             return;
         }
         String authorization = request.getHeader("Authorization");
-        if(authorization==null||!authorization.startsWith("Bearer ")){
-            throw new RuntimeException("Token missing from JwtFilter!");
-        }
-        String token=authorization.substring(7);
-        try {
-            if (!jwtService.isAccessToken(token)) {
-                throw new RuntimeException("Token is not access token!");
+        if(authorization!=null&&authorization.startsWith("Bearer ")) {
+            String token = authorization.substring(7);
+            try {
+                if (!jwtService.isAccessToken(token)) {
+                    request.setAttribute("error", "Token is not an access token");
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                String email = jwtService.getUserEmail(token);
+                String role = jwtService.getRole(token);
+                if (email == null || role == null || email.isBlank() || role.isBlank()) {
+                    request.setAttribute("error", "Required JWT claims are missing");
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(email, null, List.of(new SimpleGrantedAuthority(role)));
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            } catch (SignatureException ex) {
+                SecurityContextHolder.clearContext();
+                request.setAttribute("error", "Invalid Token signature");
+            } catch (ExpiredJwtException ex) {
+                SecurityContextHolder.clearContext();
+                request.setAttribute("error", "Access token Expired");
+            } catch (JwtException e) {
+                SecurityContextHolder.clearContext();
+                request.setAttribute("error", "Invalid or mailFormed Jwt");
             }
-            String email = jwtService.getUserEmail(token);
-            String role = jwtService.getRole(token);
-            if (email == null || role == null || email.isBlank() || role.isBlank())
-                throw new RuntimeException("Claims missing!");
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(email, null, List.of(new SimpleGrantedAuthority(role)));
-            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-        }
-        catch (SignatureException ex){
-            request.setAttribute("error","Invalid Token");
-        }
-        catch (ExpiredJwtException ex){
-            request.setAttribute("error","Access token Expired");
-        }
-        catch (Exception e){
-            request.setAttribute("error","Token missing");
         }
         filterChain.doFilter(request,response);
     }
