@@ -6,14 +6,16 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Entity
 @Data
 @Table(name="auth_table")
 @NoArgsConstructor
-public class AuthUserEntity {
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+public class AuthUserEntity implements Serializable {
+    @GeneratedValue(strategy = GenerationType.AUTO)
     @Id
     private Long id;
     private String name;

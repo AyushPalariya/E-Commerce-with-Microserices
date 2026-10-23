@@ -26,7 +26,7 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String path=request.getRequestURI();
-        if(path.startsWith("/auth")||path.equals("/user/profile")){
+        if(path.startsWith("/auth")){
             filterChain.doFilter(request,response);
             System.out.println("auth api passess.."+path);
             return;
@@ -49,6 +49,7 @@ public class JwtFilter extends OncePerRequestFilter {
                     filterChain.doFilter(request, response);
                     return;
                 }
+                request.setAttribute("Email",email);
                 UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(email, null, List.of(new SimpleGrantedAuthority(role)));
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
             } catch (SignatureException ex) {

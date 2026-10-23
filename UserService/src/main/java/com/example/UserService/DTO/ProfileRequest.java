@@ -2,17 +2,25 @@ package com.example.UserService.DTO;
 
 
 public class ProfileRequest{
+    private Long id;
     private String name;
     private String email;
     private String phone_no;
 
-    public ProfileRequest( String name, String email, String phone_no) {
+    public ProfileRequest(Long id, String name, String email, String phone_no) {
+        this.id=id;
         this.name = name;
         this.email = email;
         this.phone_no = phone_no;
     }
 
+    public Long getId() {
+        return id;
+    }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public String getName() {
         return name;
@@ -41,6 +49,7 @@ public class ProfileRequest{
     @Override
     public String toString() {
         return "ProfileRequest{" +
+                "id=" + id +
                 ", name='" + name + '\'' +
                 ", email='" + email + '\'' +
                 ", phone_no='" + phone_no + '\'' +

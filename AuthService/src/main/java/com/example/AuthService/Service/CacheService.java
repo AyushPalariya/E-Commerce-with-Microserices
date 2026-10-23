@@ -1,5 +1,6 @@
 package com.example.AuthService.Service;
 
+import com.example.AuthService.Entities.AuthUserEntity;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -39,6 +40,4 @@ public class CacheService {
     public void removeUser(String email){
         System.out.println("cacheEvict for user working..");
     }
-
-
 }

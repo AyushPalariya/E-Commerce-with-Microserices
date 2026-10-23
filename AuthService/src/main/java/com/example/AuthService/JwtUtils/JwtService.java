@@ -1,5 +1,7 @@
 package com.example.AuthService.JwtUtils;
 
+import com.example.AuthService.Entities.AuthUserEntity;
+import com.example.AuthService.Entities.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;

@@ -26,12 +26,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -68,7 +70,7 @@ public class AuthService {
     }
 
     private String sendData(AuthUserEntity user) {
-        UserDataSend send=new UserDataSend(user.getName(),user.getEmail(),user.getPhone_no());
+        UserDataSend send=new UserDataSend(user.getId(),user.getName(),user.getEmail(),user.getPhone_no());
         System.out.println(send);
         String json=new ObjectMapper().writeValueAsString(send);
         System.out.println("ObjectMapper use\n"+json);
@@ -88,6 +90,7 @@ public class AuthService {
         if (userLogin.getPassword() == null || userLogin.getPassword().isBlank()) throw new BadCredentialsException("Please enter password!");
             Authentication auth = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(userLogin.getEmail(), userLogin.getPassword()));
             System.out.println("authentication successful");
+            AuthUserEntity byEmail = authRepo.findByEmail(userLogin.getEmail()).orElseThrow(()->new BadCredentialsException("Please check your mail!"));
             UserDetails details = (UserDetails) auth.getPrincipal();
             String accessToken = jwtService.generateToken(details);
             String jti=refreshTokenJti();
@@ -96,9 +99,9 @@ public class AuthService {
             cacheService.putUser(details);
             cookieService.attachToken(refreshToken, jwtService.getRftAccessibleTime(), response);
             String role = jwtService.getRole(details);
-            return new LoginResponse(accessToken, refreshToken, details.getUsername(), Role.valueOf(role));
+            return new LoginResponse(byEmail.getId(), accessToken, refreshToken, details.getUsername(), Role.valueOf(role));
     }
-
+    @Transactional
     public LoginResponse refreshToken(String refreshToken, HttpServletRequest request,HttpServletResponse response) {
         String token=readToken(refreshToken,request);
         if(token==null) throw new AuthenticationExceptionClass("Refresh token missing!");
@@ -124,12 +127,8 @@ public class AuthService {
         cacheService.putJit(email,jti);
         cacheService.putUser(user);
         cookieService.attachToken(refreshToken1,jwtService.getRftAccessibleTime(),response);
-        String role = user.getAuthorities()
-                .stream()
-                .findFirst()
-                .map(GrantedAuthority::getAuthority)
-                .orElseThrow(()->new RuntimeException("User has no role"));
-        return new LoginResponse(accessToken,refreshToken1, user.getUsername(),Role.valueOf(role));
+        String role= jwtService.getRole(user);
+        return new LoginResponse(null,accessToken,refreshToken1, user.getUsername(),Role.valueOf(role));
 
     }
 
@@ -144,7 +143,7 @@ public class AuthService {
         }
         return null;
     }
-
+    @Transactional
     public void logout(HttpServletRequest req,HttpServletResponse res) {
         String s = readToken(null, req);
         if(s==null) throw new BadCredentialsException("refresh token missing from logout!");
@@ -154,5 +153,15 @@ public class AuthService {
         cookieService.clear(res);
         cookieService.clearHeader(res);
         SecurityContextHolder.clearContext();
+    }
+    @Transactional
+    public String delete(String email,HttpServletResponse res) {
+        authRepo.deleteByEmail(email);
+        cacheService.removeJti(email);
+        cacheService.removeUser(email);
+        cookieService.clear(res);
+        cookieService.clearHeader(res);
+        return "User deleted form authService with email_id:"+email;
+
     }
 }

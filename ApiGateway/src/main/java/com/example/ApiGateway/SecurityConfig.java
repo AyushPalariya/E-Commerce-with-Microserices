@@ -26,8 +26,10 @@ public class SecurityConfig {
                 .formLogin(f->f.disable())
                 .httpBasic(b->b.disable())
                 .sessionManagement((sm)->sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(req->req.requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/user/profile").permitAll()
+                .authorizeHttpRequests(req->req
+                        .requestMatchers("/auth/delete/{email}").hasAnyRole("USER","ADMIN")
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/user/getAllProfile").hasRole("ADMIN")
                         .requestMatchers("/user/**").hasAnyRole("ADMIN","USER")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
@@ -63,6 +65,7 @@ public class SecurityConfig {
         return httpSecurity.build();
 
     }
+    //auto generawted password not show
     @Bean
     public UserDetailsService userDetailsService() {
         return new InMemoryUserDetailsManager();
