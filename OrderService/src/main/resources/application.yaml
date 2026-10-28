@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: OrderService
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/ZecOrderDB
+    username: root
+    password: Ayush@2003
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8081/eureka/
+
+server:
+  port: 8085

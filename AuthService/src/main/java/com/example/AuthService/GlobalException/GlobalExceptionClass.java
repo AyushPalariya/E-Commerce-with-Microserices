@@ -20,13 +20,18 @@ public class GlobalExceptionClass {
         ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.BAD_REQUEST,"Bad Credentials", ex.getMessage(), request.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
+    @ExceptionHandler(BadRequestExceptionClass.class)
+    public ResponseEntity<ApiError> handleBadCredential(BadRequestExceptionClass ex, HttpServletRequest request){
+        ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.BAD_REQUEST,"Invalid Input", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiError> handleConflictException(ConflictException ex,HttpServletRequest req){
         ApiError error=new ApiError(LocalDateTime.now(),HttpStatus.CONFLICT,"Email Conflict",ex.getMessage(),req.getRequestURI());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
-    @ExceptionHandler(UsernameNotFoundException.class)
-    public ResponseEntity<ApiError> handleNotFound(UsernameNotFoundException ex,HttpServletRequest req){
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(NotFoundException ex,HttpServletRequest req){
         ApiError error=new ApiError(LocalDateTime.now(),HttpStatus.NOT_FOUND,"Resource not found",ex.getMessage(),req.getRequestURI());
         return new ResponseEntity<>(error,HttpStatus.NOT_FOUND);
     }

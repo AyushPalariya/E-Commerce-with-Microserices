@@ -11,10 +11,15 @@ spring:
               uri: lb://AUTHSERVICE
               predicates:
                 - Path=/auth/**
-            - id: USERSERVICE
+            - id: USER-SERVICE
               uri: lb://USERSERVICE
               predicates:
                 - Path=/user/**
+            - id: PRODUCT-SERVICE
+              uri: lb://PRODUCTSERVICE
+              predicates:
+                - Path=/products/**
+
 security:
   jwt:
     key: djaijdfnneijrie834382njnefnsdfekwapiwej02393wjnrefejwfnfslaeialewer323nnfioeje33

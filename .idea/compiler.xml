@@ -3,16 +3,6 @@
   <component name="CompilerConfiguration">
     <annotationProcessing>
       <profile default="true" name="Default" enabled="true" />
-      <profile name="Annotation profile for AuthService" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-        </processorPath>
-        <module name="AuthService" />
-      </profile>
       <profile name="Maven default annotation processors profile" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
@@ -20,14 +10,36 @@
         <module name="EurekaDiscovery" />
         <module name="ApiGateway" />
       </profile>
+      <profile name="Annotation profile for OrderService" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.48/lombok-1.18.48.jar" />
+        </processorPath>
+        <module name="OrderService" />
+      </profile>
+      <profile name="Annotation profile for ProductService" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.48/lombok-1.18.48.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.48/lombok-1.18.48.jar" />
+        </processorPath>
+        <module name="ProductService" />
+        <module name="EmailService" />
+      </profile>
       <profile name="Annotation profile for UserService" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
         <module name="UserService" />
+        <module name="AuthService" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
@@ -38,7 +50,10 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="ApiGateway" options="-parameters" />
       <module name="AuthService" options="-parameters" />
+      <module name="EmailService" options="-parameters" />
       <module name="EurekaDiscovery" options="-parameters" />
+      <module name="OrderService" options="-parameters" />
+      <module name="ProductService" options="-parameters" />
       <module name="UserDemo" options="-parameters" />
       <module name="UserService" options="-parameters" />
     </option>

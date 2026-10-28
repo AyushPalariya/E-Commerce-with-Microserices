@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class UserRegistration {
     private Long id;
     private String name;
+    private String password;
     private String email;
     private String phone_no;
     private Boolean enable;

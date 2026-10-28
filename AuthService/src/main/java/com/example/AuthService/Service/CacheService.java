@@ -8,6 +8,8 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.util.Random;
+
 @Service
 public class CacheService {
 
@@ -39,5 +41,20 @@ public class CacheService {
     @CacheEvict(value = "users",key = "#email")
     public void removeUser(String email){
         System.out.println("cacheEvict for user working..");
+    }
+
+    @CachePut(value = "otp",key = "#email")
+    public String  generateOtp(String email) {
+        Random random = new Random();
+        int otp = random.nextInt(100000, 1000000);
+        return String.valueOf(otp);
+    }
+    @Cacheable(value = "otp",key = "#email")
+    public String getOtp(String email) {
+        return null;
+    }
+    @CacheEvict(value = "otp",key = "#email")
+    public void removeOtp(String email) {
+        System.out.println("otp deleted from cache..");
     }
 }

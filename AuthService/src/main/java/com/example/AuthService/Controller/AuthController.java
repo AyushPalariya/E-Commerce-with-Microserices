@@ -1,18 +1,15 @@
 package com.example.AuthService.Controller;
 
-import com.example.AuthService.DTO.LoginResponse;
-import com.example.AuthService.DTO.UserLoginRequest;
-import com.example.AuthService.DTO.UserRegistration;
+import com.example.AuthService.DTO.*;
 import com.example.AuthService.Service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
@@ -38,8 +35,21 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
     @DeleteMapping("/delete/{email}")
-    public ResponseEntity<String> delete(@PathVariable String email,HttpServletResponse res){
+    public ResponseEntity<String> delete(@PathVariable("email") String email, HttpServletResponse res){
         return ResponseEntity.status(HttpStatus.OK).body(authService.delete(email,res));
+    }
+
+    @PostMapping("/forgotPassword")
+    public ResponseEntity<Map<String,String>> forgotPassword(@RequestBody Map<String,String> mp){
+        return ResponseEntity.status(HttpStatus.OK).body(authService.forgot(mp));
+    }
+    @PostMapping("/valid-otp")
+    public ResponseEntity<Map<String,String>> passwordReset(@RequestBody OtpToken otpToken){
+        return ResponseEntity.status(HttpStatus.OK).body(authService.validateOtp(otpToken));
+    }
+    @PatchMapping("/password-reset")
+    public ResponseEntity<Map<String,String>> passwordReset(@RequestBody PasswordResetRequest resetRequest){
+        return ResponseEntity.status(HttpStatus.OK).body(authService.resetPassword(resetRequest));
     }
 
 }

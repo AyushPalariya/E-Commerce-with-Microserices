@@ -11,7 +11,11 @@ import jakarta.ws.rs.NotFoundException;
 import lombok.Data;
 import org.apache.catalina.authenticator.BasicAuthenticator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -27,6 +31,10 @@ public class UserService {
     private UserRepo userRepo;
     @Autowired
     private WebClient webClient;
+    @Autowired
+    private CacheManager cacheManager;
+
+
     @Transactional
     public String  createProfile(ProfileRequest profile) {
         if(profile.getId()==null) throw new BadCredentialClass("Id is required!");
@@ -38,9 +46,9 @@ public class UserService {
         userRepo.save(userProfile);
         return "Profile Created!";
     }
-
-    public UserProfile updateProfile(Long id,Map<String , Object> fields) {
-        UserProfile userProfile = userRepo.findById(id).orElseThrow(() -> new NotFoundException("User Profile not found!"));
+    @CachePut(value = "profile",key = "#email")
+    public UserProfile updateProfile(String email,Map<String , Object> fields) {
+        UserProfile userProfile = userRepo.findByEmail(email).orElseThrow(() -> new NotFoundException("User Profile not found!"));
         for(String key:fields.keySet()){
             if(key.equals("address")) userProfile.setAddress((String)fields.get(key));
             if(key.equals("img")) userProfile.setImg((String) fields.get(key));
@@ -52,21 +60,24 @@ public class UserService {
         System.out.println("Profile update!");
         return userProfile;
     }
-    @Cacheable(value = "profile",key="#id")
-    public UserProfile getProfile(Long id){
-        return userRepo.findById(id).orElseThrow(() -> new NotFoundException("User Profile not found!"));
+
+    @Cacheable(value = "profile",key="#email")
+    public UserProfile getProfileByEmail(String email) {
+        return userRepo.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("User Profile not found!"));
     }
 
     public List<UserProfile> getAllUserProfile(){
         return userRepo.findAll();
     }
-    @CacheEvict(value = "profile",key = "#id")
-    public void deleteUser(Long id){
-        UserProfile userProfile = userRepo.findById(id).orElseThrow(() -> new NotFoundException("User Profile not found!"));
-        String s=webClientMethod(userProfile.getEmail());
+    @Transactional
+    @CacheEvict(value = "profile",key="#email")
+    public void deleteUser(String email){
+        if(!userRepo.existsByEmail(email)) throw new BadCredentialClass("Email not found!");
+        String s=webClientMethod(email);
         System.out.println(s);
-        userRepo.deleteById(id);
-        System.out.println("User Profile is deleted from UserService with "+id);
+        userRepo.deleteByEmail(email);
+        System.out.println("User Profile is deleted from UserService with "+email);
     }
 
     private String webClientMethod(String email) {

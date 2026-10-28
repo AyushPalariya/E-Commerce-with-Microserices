@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: ProductService
+  datasource:
+    url: jdbc:mysql://localhost:3306/ZecProductDB
+    username: root
+    password: Ayush@2003
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+server:
+  port: 8084
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8081/eureka/
