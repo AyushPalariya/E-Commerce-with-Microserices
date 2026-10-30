@@ -46,7 +46,7 @@ public class UserService {
         userRepo.save(userProfile);
         return "Profile Created!";
     }
-    @CachePut(value = "profile",key = "#email")
+    @CacheEvict(value = "profile",key = "#email")
     public UserProfile updateProfile(String email,Map<String , Object> fields) {
         UserProfile userProfile = userRepo.findByEmail(email).orElseThrow(() -> new NotFoundException("User Profile not found!"));
         for(String key:fields.keySet()){

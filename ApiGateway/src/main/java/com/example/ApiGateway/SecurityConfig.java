@@ -32,8 +32,11 @@ public class SecurityConfig {
                         .requestMatchers("/auth/delete/{email}").hasAnyRole("USER","ADMIN")
                         .requestMatchers("/products/**").permitAll()//after testing define role ADMIN
                         .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/order/test").permitAll()
                         .requestMatchers("/user/getAllProfile").hasRole("ADMIN")
+                        .requestMatchers("/order/getAllOrders").hasRole("ADMIN")
                         .requestMatchers("/user/**").hasAnyRole("ADMIN","USER")
+                        .requestMatchers("/order/**").hasRole("USER")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex->ex.authenticationEntryPoint((request, response, authException) ->

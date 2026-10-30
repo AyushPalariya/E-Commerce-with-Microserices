@@ -40,26 +40,26 @@ public class JwtService {
                 .orElseThrow(()->new RuntimeException("User has no role"));
     }
 
-    public String generateToken(UserDetails details) {
+    public String generateToken(UserDetails details,Long id) {
         String role=getRole(details);
         return Jwts.builder()
                 .setSubject(details.getUsername())
                 .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis()+(600*1000)))//10 min
-                .addClaims(Map.of("type","access","role",role))
+                .addClaims(Map.of("type","access","role",role,"id",id))
                 .signWith(secretKey)
                 .compact();
     }
 
-    public String refreshToken(UserDetails details,String jti) {
+    public String refreshToken(UserDetails details,String jti,Long id) {
         String role=getRole(details);
         return Jwts.builder()
                 .setSubject(details.getUsername())
                 .setId(jti)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis()+(rftAccessibleTime * 1000L))) //200min means 3h:20 min
-                .addClaims(Map.of("type","refresh","role",role))
+                .addClaims(Map.of("type","refresh","role",role,"id",id))
                 .signWith(secretKey)
                 .compact();
     }

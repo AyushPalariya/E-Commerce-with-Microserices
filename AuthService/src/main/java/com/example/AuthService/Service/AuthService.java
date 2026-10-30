@@ -121,16 +121,19 @@ public class AuthService {
             throw new BadRequestExceptionClass("Please enter password!");
         Authentication auth = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(userLogin.getEmail(), userLogin.getPassword()));
         System.out.println("authentication successful");
-        AuthUserEntity byEmail = authRepo.findByEmail(userLogin.getEmail()).orElseThrow(() -> new BadCredentialsException("Please check your mail!"));
         UserDetails details = (UserDetails) auth.getPrincipal();
-        String accessToken = jwtService.generateToken(details);
+        String email=details.getUsername();
+        AuthUserEntity data = cacheService.getData(email);
+        String accessToken = jwtService.generateToken(details,data.getId());
         String jti = refreshTokenJti();
-        String refreshToken = jwtService.refreshToken(details, jti);
-        cacheService.putJit(details.getUsername(), jti);
+        String refreshToken = jwtService.refreshToken(details, jti,data.getId());
+
+        cacheService.putJit(email, jti);
         cacheService.putUser(details);
+
         cookieService.attachToken(refreshToken, jwtService.getRftAccessibleTime(), response);
         String role = jwtService.getRole(details);
-        return new LoginResponse(byEmail.getId(),byEmail.getName() ,accessToken, refreshToken, details.getUsername(), Role.valueOf(role));
+        return new LoginResponse(data.getId(),data.getName() ,accessToken, refreshToken, details.getUsername(), Role.valueOf(role));
     }
 
     @Transactional
@@ -153,14 +156,15 @@ public class AuthService {
         if (cacheJti == null) throw new AuthenticationExceptionClass("cache Jti is missing");
         System.out.println("cachejti: " + cacheJti);
         if (!cacheJti.equals(jwtService.getJti(token))) throw new AuthenticationExceptionClass("Jti mismatched!");
-        String accessToken = jwtService.generateToken(user);
+        AuthUserEntity data = cacheService.getData(email);
+        String accessToken = jwtService.generateToken(user, data.getId());
         String jti = refreshTokenJti();
-        String refreshToken1 = jwtService.refreshToken(user, jti);
+        String refreshToken1 = jwtService.refreshToken(user, jti, data.getId());
         cacheService.putJit(email, jti);
         cacheService.putUser(user);
         cookieService.attachToken(refreshToken1, jwtService.getRftAccessibleTime(), response);
         String role = jwtService.getRole(user);
-        return new LoginResponse(null,null,accessToken, refreshToken1, user.getUsername(), Role.valueOf(role));
+        return new LoginResponse(data.getId(),data.getName(),accessToken, refreshToken1, user.getUsername(), Role.valueOf(role));
     }
 
     private String readToken(String refreshToken, HttpServletRequest request) {
@@ -197,7 +201,7 @@ public class AuthService {
         cookieService.clearHeader(res);
         return "User deleted form authService with email_id:" + email;
     }
-
+    @Transactional
     public Map<String, String> forgot(Map<String, String> mp) {
         //"email":"..."
         if (mp == null) throw new BadRequestExceptionClass("mp not be null!");
@@ -220,7 +224,7 @@ public class AuthService {
 
         return Map.of("email", email,"datetime",String.valueOf(LocalDateTime.now().plusMinutes(5)));
     }
-
+    @Transactional
     public Map<String, String> resetPassword(PasswordResetRequest request) {
         String email = request.getEmail();
         if (email == null || email.isBlank()) throw new BadRequestExceptionClass("Email invalid!");
@@ -232,10 +236,8 @@ public class AuthService {
             throw new RuntimeException("Password not matches with Confirm password!");
         cacheService.removeJti(email);
         cacheService.removeUser(email);
-        AuthUserEntity authUserEntity = authRepo.findByEmail(email).orElseThrow(() -> new NotFoundException("Email not found!"));
-        authUserEntity.setPassword(passwordEncoder.encode(request.getConfirmPassword()));
-      //  savePasswordByEmail(email, request.getConfirmPassword()).orElseThrow(() -> new NotFoundClass("Email not found!"));
-        authRepo.save(authUserEntity);
+        int v=authRepo.savePasswordByEmail(email,passwordEncoder.encode(request.getConfirmPassword()),LocalDateTime.now());
+        if(v==0) throw new NotFoundClass("Password not update! "+email);
         return Map.of("SUCCESS","Password changed");
     }
 
@@ -246,8 +248,7 @@ public class AuthService {
             throw new AuthenticationExceptionClass("Otp expired!");
         }
         String otp = cacheService.getOtp(otpToken.getEmail());
-        if(!otp.equals(otpToken.getOtp())) {
-            cacheService.removeOtp(otpToken.getEmail());
+        if(otp==null||!otp.equals(otpToken.getOtp())) {
             throw new AuthenticationExceptionClass("Otp incorrect!");
         }
         cacheService.removeOtp(otpToken.getEmail());

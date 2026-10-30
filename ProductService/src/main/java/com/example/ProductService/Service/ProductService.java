@@ -48,6 +48,7 @@ public class ProductService {
         Products p= productRepo.findById(id).orElseThrow(()->new ResourceNotFound("Product not found with id: "+id));
         return new Product(p.getId(),p.getCategory(),p.getDescription(),p.getImg(),p.getAmount(), p.getName());
     }
+    @CacheEvict(value = "product",key = "#id")
     public Product updateProduct(Long id, Map<String,Object> mp){
         Products p= productRepo.findById(id).orElseThrow(()->new ResourceNotFound("Product not found with id: "+id));
         for(String key:mp.keySet()){
@@ -61,7 +62,7 @@ public class ProductService {
         return new Product(p.getId(),p.getCategory(),p.getDescription(),p.getImg(),p.getAmount(), p.getName());
     }
 
-
+    @CacheEvict(value = "product",key = "#id")
     public Map<String,String> deleteProduct(Long id){
         if(!productRepo.existsById(id)) throw new ResourceNotFound("Product not found with id: "+id);
         productRepo.deleteById(id);

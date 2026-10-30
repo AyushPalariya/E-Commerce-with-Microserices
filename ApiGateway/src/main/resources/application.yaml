@@ -19,6 +19,10 @@ spring:
               uri: lb://PRODUCTSERVICE
               predicates:
                 - Path=/products/**
+            - id: ORDER-SERVICE
+              uri: lb://ORDERSERVICE
+              predicates:
+                - Path=/order/**
 
 security:
   jwt:

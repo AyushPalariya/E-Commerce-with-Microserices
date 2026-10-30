@@ -5,13 +5,25 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/ZecOrderDB
     username: root
-    password: Ayush@2003
+    password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: update
     show-sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: true
 eureka:
   client:
     serviceUrl:
@@ -19,3 +31,7 @@ eureka:
 
 server:
   port: 8085
+
+kafka:
+  topic:
+    order: orderPlace

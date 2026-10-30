@@ -40,5 +40,10 @@ public class JwtService {
     public String getRole(String token) {
         return claims(token).getBody().get("role").toString();
     }
+    public Integer getUserId(String token) {
+        Integer id = (Integer) claims(token).getBody().get("id");
+        System.out.println(id.getClass().getName());
+        return id;
+    }
 }
 

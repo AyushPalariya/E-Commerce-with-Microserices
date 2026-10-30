@@ -1,9 +1,12 @@
 package com.example.AuthService.Service;
 
 import com.example.AuthService.Entities.AuthUserEntity;
+import com.example.AuthService.Repository.AuthRepo;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -12,6 +15,8 @@ import java.util.Random;
 
 @Service
 public class CacheService {
+    @Autowired
+    private AuthRepo authRepo;
 
     @CachePut(value = "rft",key = "#email")
     public String putJit(String email,String jti) {
@@ -56,5 +61,10 @@ public class CacheService {
     @CacheEvict(value = "otp",key = "#email")
     public void removeOtp(String email) {
         System.out.println("otp deleted from cache..");
+    }
+
+    @Cacheable(value = "AuthUserEntity",key = "#email")
+    public AuthUserEntity getData(String email){
+        return authRepo.findByEmail(email).orElseThrow(() -> new BadCredentialsException("Please check your mail!"));
     }
 }

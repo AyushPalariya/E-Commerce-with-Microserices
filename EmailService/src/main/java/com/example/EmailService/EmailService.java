@@ -10,6 +10,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Slf4j
 @RequiredArgsConstructor
 @Service
@@ -50,6 +52,37 @@ public class EmailService {
                         + resetRequest.getOtp() + "\n\n"
                         + "If you did not request a password reset, you can ignore this email."
         );
+        javaMailSender.send(mimeMessage);
+    }
+
+    @KafkaListener(topics="${kafka.topic.order}",groupId = "order-place-group")
+    public void sendOrderPlaced(OrderPlace orderPlace) throws MessagingException {
+        MimeMessage mimeMessage=javaMailSender.createMimeMessage();
+        MimeMessageHelper helper=new MimeMessageHelper(mimeMessage,true);
+        helper.setTo(orderPlace.getUserEmail());
+        helper.setSubject("Order placed Successfully");
+        StringBuilder orderDetails = new StringBuilder();
+
+        orderDetails.append("Hello ").append(orderPlace.getName())
+                .append(",\n\n")
+                .append("Thank you for placing your order!\n\n")
+                .append("Your Order Details:\n\n");
+        List<ItemDto> list=orderPlace.getItems();
+        orderDetails.append("   " + "Name" + "\t" + "\tQuantities" + "\t" + "amount" + "\n");
+        for (int i = 0; i < list.size(); i++) {
+
+            orderDetails .append(i + 1).append(". ").append(list.get(i).getProduct_name())
+                    .append("\t").append("  ").append(list.get(i).getQuantities())
+                    .append("\t").append("  ").append(list.get(i).getSubAmount()).append("\n");
+        }
+
+        orderDetails.append("Total Amount: ")
+                .append(orderPlace.getTotalAmount())
+                .append("\n\n")
+                .append("Thank you for shopping with us!");
+        System.out.println(orderDetails);
+        helper.setText(orderDetails.toString());
+        //also generate pdf and send to mail_id
         javaMailSender.send(mimeMessage);
     }
 }
