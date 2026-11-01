@@ -4,6 +4,7 @@ import com.example.UserService.DTO.ProfileRequest;
 import com.example.UserService.Entities.UserProfile;
 import com.example.UserService.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,7 +37,12 @@ public class UserController {
     }
     @DeleteMapping("/delete")
     public ResponseEntity<Void> deleteProfile(@RequestHeader("X-Authenticated-Email") String email){
-        userService.deleteUser(email);
-        return ResponseEntity.noContent().build();
+        ResponseEntity<String> auth = userService.deleteUser(email);
+        return ResponseEntity.noContent().headers(headers -> headers.addAll(auth.getHeaders())).build();
+        //or
+//        HttpHeaders headers = new HttpHeaders();
+//        headers.put(HttpHeaders.SET_COOKIE,
+//                auth.getHeaders().get(HttpHeaders.SET_COOKIE));
+//        return new ResponseEntity<>(headers, HttpStatus.NO_CONTENT);
     }
 }

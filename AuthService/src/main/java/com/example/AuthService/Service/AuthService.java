@@ -9,6 +9,7 @@ import com.example.AuthService.GlobalException.ConflictException;
 import com.example.AuthService.GlobalException.NotFoundClass;
 import com.example.AuthService.JwtUtils.JwtService;
 import com.example.AuthService.Repository.AuthRepo;
+import com.example.AuthService.Repository.FeignClientInterface;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -46,7 +49,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CookieService cookieService;
-    private final RestClient restclient;
+    private final FeignClientInterface feignClientInterface;
     @Autowired
     private KafkaTemplate<String, Object> template;
     @Value("${kafka.topic.name}")
@@ -56,12 +59,15 @@ public class AuthService {
 
     @Transactional
     public UserRegistration register(UserRegistration userRegistration) {
+        if (userRegistration == null) throw new BadRequestExceptionClass("Registration details are required!");
         if (userRegistration.getEmail() == null || userRegistration.getEmail().isBlank())
             throw new BadRequestExceptionClass("Please enter mail id!");
         if (userRegistration.getName() == null || userRegistration.getName().isBlank())
             throw new BadRequestExceptionClass("Please enter name!");
         if (userRegistration.getPhone_no() == null || userRegistration.getPhone_no().isBlank())
             throw new BadRequestExceptionClass("Please enter phone_no!");
+        if (userRegistration.getPassword() == null || userRegistration.getPassword().isBlank())
+            throw new BadRequestExceptionClass("Please enter password!");
         if (authRepo.existsByEmail(userRegistration.getEmail())) throw new ConflictException("Email already exist.");
         AuthUserEntity u = new AuthUserEntity();
         u.setEmail(userRegistration.getEmail());
@@ -71,10 +77,10 @@ public class AuthService {
         u.setPassword(passwordEncoder.encode(userRegistration.getPassword()));
         u.setRole(Role.ROLE_USER);
         u = authRepo.save(u);
-        //restClient
-        String s = sendData(u);
-        if (s == null) throw new BadRequestExceptionClass("Profile is not created for user!");
-        //
+
+        ResponseEntity<String> s = sendData(u);
+        if (s == null || !s.getStatusCode().is2xxSuccessful())
+            throw new IllegalStateException("Profile service did not create the user profile");
         try {
             var result = template.send(
                     topicName,
@@ -98,16 +104,12 @@ public class AuthService {
         return new UserRegistration(u.getId(), u.getName(), u.getPassword(), u.getEmail(), u.getPhone_no(), u.getEnable(), u.getRole(), u.getCreatedAt(), u.getUpdatedAt());
     }
 
-    private String sendData(AuthUserEntity user) {
+    private ResponseEntity<String> sendData(AuthUserEntity user) {
         UserDataSend send = new UserDataSend(user.getId(), user.getName(), user.getEmail(), user.getPhone_no());
         System.out.println(send);
         String json = new ObjectMapper().writeValueAsString(send);
         System.out.println("ObjectMapper use\n" + json);
-        return restclient.post()
-                .uri("http://localhost:8083/user/profile")
-                .body(send)
-                .retrieve()
-                .body(String.class);
+        return feignClientInterface.sendData(send);
     }
 
     public String refreshTokenJti() {
@@ -115,6 +117,7 @@ public class AuthService {
     }
 
     public LoginResponse login(UserLoginRequest userLogin, HttpServletResponse response) {
+        if (userLogin == null) throw new BadRequestExceptionClass("Login details are required!");
         if (userLogin.getEmail() == null || userLogin.getEmail().isBlank())
             throw new BadRequestExceptionClass("Please enter mail id!");
         if (userLogin.getPassword() == null || userLogin.getPassword().isBlank())
@@ -123,7 +126,7 @@ public class AuthService {
         System.out.println("authentication successful");
         UserDetails details = (UserDetails) auth.getPrincipal();
         String email=details.getUsername();
-        AuthUserEntity data = cacheService.getData(email);
+        AuthUserEntity data = cacheService.getAuthUser(email);
         String accessToken = jwtService.generateToken(details,data.getId());
         String jti = refreshTokenJti();
         String refreshToken = jwtService.refreshToken(details, jti,data.getId());
@@ -145,7 +148,7 @@ public class AuthService {
         }
         String email = jwtService.getUserEmail(token);
         if (email == null || email.isBlank()) throw new AuthenticationExceptionClass("Email missing!");
-        System.out.println("token email: " + email);
+        System.out.println("refresh token email: " + email);
 
         UserDetails user = cacheService.getUser(email);
         if (user == null) throw new AuthenticationExceptionClass("user not present in cache!");
@@ -156,7 +159,7 @@ public class AuthService {
         if (cacheJti == null) throw new AuthenticationExceptionClass("cache Jti is missing");
         System.out.println("cachejti: " + cacheJti);
         if (!cacheJti.equals(jwtService.getJti(token))) throw new AuthenticationExceptionClass("Jti mismatched!");
-        AuthUserEntity data = cacheService.getData(email);
+        AuthUserEntity data = cacheService.getAuthUser(email);
         String accessToken = jwtService.generateToken(user, data.getId());
         String jti = refreshTokenJti();
         String refreshToken1 = jwtService.refreshToken(user, jti, data.getId());
@@ -186,6 +189,7 @@ public class AuthService {
         String email = jwtService.getUserEmail(s);
         cacheService.removeJti(email);
         cacheService.removeUser(email);
+        cacheService.removeAuthUser(email);
         cookieService.clear(res);
         cookieService.clearHeader(res);
         SecurityContextHolder.clearContext();
@@ -194,9 +198,12 @@ public class AuthService {
 
     @Transactional
     public String delete(String email, HttpServletResponse res) {
+        if (email == null || email.isBlank()) throw new BadRequestExceptionClass("Email is required!");
+        if (!authRepo.existsByEmail(email)) throw new NotFoundClass("User not found for email: " + email);
         authRepo.deleteByEmail(email);
         cacheService.removeJti(email);
         cacheService.removeUser(email);
+        cacheService.removeAuthUser(email);
         cookieService.clear(res);
         cookieService.clearHeader(res);
         return "User deleted form authService with email_id:" + email;
@@ -215,17 +222,20 @@ public class AuthService {
         forget.setOtp(otp);
 
         try {
-            template.send(resetTopic, email, forget);
-            System.out.println("send email to emailService for reset password");
-        } catch (Exception e) {
-            System.out.println("email service not work for forgotPassword!");
-            System.out.println(e.getMessage());
+            template.send(resetTopic, email, forget).get();
+            log.info("Password reset email event published for email={}", email);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while publishing password reset email event", e);
+        } catch (ExecutionException e) {
+            throw new IllegalStateException("Failed to publish password reset email event", e.getCause());
         }
 
         return Map.of("email", email,"datetime",String.valueOf(LocalDateTime.now().plusMinutes(5)));
     }
     @Transactional
     public Map<String, String> resetPassword(PasswordResetRequest request) {
+        if (request == null) throw new BadRequestExceptionClass("Password reset details are required!");
         String email = request.getEmail();
         if (email == null || email.isBlank()) throw new BadRequestExceptionClass("Email invalid!");
         if (request.getNewPassword() == null || request.getNewPassword().isBlank())
@@ -233,7 +243,8 @@ public class AuthService {
         if (request.getConfirmPassword() == null || request.getConfirmPassword().isBlank())
             throw new BadRequestExceptionClass("Confirm password required!");
         if (!request.getNewPassword().equals(request.getConfirmPassword()))
-            throw new RuntimeException("Password not matches with Confirm password!");
+            throw new BadRequestExceptionClass("Password does not match the confirmation password!");
+        if (!authRepo.existsByEmail(email)) throw new NotFoundClass("User not found for email: " + email);
         cacheService.removeJti(email);
         cacheService.removeUser(email);
         int v=authRepo.savePasswordByEmail(email,passwordEncoder.encode(request.getConfirmPassword()),LocalDateTime.now());
@@ -242,7 +253,19 @@ public class AuthService {
     }
 
     public Map<String, String> validateOtp(OtpToken otpToken) {
-        LocalDateTime afterTime = LocalDateTime.parse(otpToken.getDatetime());
+        if (otpToken == null) throw new BadRequestExceptionClass("OTP details are required!");
+        if (otpToken.getEmail() == null || otpToken.getEmail().isBlank())
+            throw new BadRequestExceptionClass("Email is required!");
+        if (otpToken.getOtp() == null || otpToken.getOtp().isBlank())
+            throw new BadRequestExceptionClass("OTP is required!");
+        if (otpToken.getDatetime() == null || otpToken.getDatetime().isBlank())
+            throw new BadRequestExceptionClass("OTP expiration time is required!");
+        LocalDateTime afterTime;
+        try {
+            afterTime = LocalDateTime.parse(otpToken.getDatetime());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new BadRequestExceptionClass("OTP expiration time is invalid!");
+        }
         if(LocalDateTime.now().isAfter(afterTime)) {
             cacheService.removeOtp(otpToken.getEmail());
             throw new AuthenticationExceptionClass("Otp expired!");

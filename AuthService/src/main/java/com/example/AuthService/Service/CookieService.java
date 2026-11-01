@@ -32,16 +32,19 @@ public class CookieService {
     }
 
     public void attachToken(String rft, int validUpto, HttpServletResponse response){
+        System.out.println("Cookie attach");
         ResponseCookie build = ResponseCookie.from(refreshTokenName, rft).domain(cookieDomain).httpOnly(cookieHttpOnly).secure(cookieSecure)
                 .sameSite(cookieSameSite).path("/").maxAge(Duration.ofSeconds(validUpto)).build();
         response.addHeader(HttpHeaders.SET_COOKIE,build.toString());
     }
     public void clear(HttpServletResponse response){
+        System.out.println("Cookie clear from response");
         ResponseCookie build = ResponseCookie.from(refreshTokenName, "").domain(cookieDomain).httpOnly(cookieHttpOnly).secure(cookieSecure)
                 .sameSite(cookieSameSite).path("/").maxAge(Duration.ofSeconds(0)).build();
         response.addHeader(HttpHeaders.SET_COOKIE,build.toString());
     }
     public void clearHeader(HttpServletResponse res){
+        System.out.println("Header clear from response");
         res.setHeader(HttpHeaders.CACHE_CONTROL,"no-store");
         res.setHeader(HttpHeaders.PRAGMA,"no-cache");
     }

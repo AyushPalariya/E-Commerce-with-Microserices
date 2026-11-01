@@ -17,8 +17,8 @@ import java.time.LocalDateTime;
 public class GlobalExceptionClass {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiError> handleBadCredential(BadCredentialsException ex, HttpServletRequest request){
-        ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.BAD_REQUEST,"Bad Credentials", ex.getMessage(), request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.UNAUTHORIZED,"Bad Credentials", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
     @ExceptionHandler(BadRequestExceptionClass.class)
     public ResponseEntity<ApiError> handleBadCredential(BadRequestExceptionClass ex, HttpServletRequest request){
@@ -30,8 +30,8 @@ public class GlobalExceptionClass {
         ApiError error=new ApiError(LocalDateTime.now(),HttpStatus.CONFLICT,"Email Conflict",ex.getMessage(),req.getRequestURI());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
-    @ExceptionHandler(NotFoundException.class)
-    public ResponseEntity<ApiError> handleNotFound(NotFoundException ex,HttpServletRequest req){
+    @ExceptionHandler({NotFoundException.class, NotFoundClass.class})
+    public ResponseEntity<ApiError> handleNotFound(RuntimeException ex,HttpServletRequest req){
         ApiError error=new ApiError(LocalDateTime.now(),HttpStatus.NOT_FOUND,"Resource not found",ex.getMessage(),req.getRequestURI());
         return new ResponseEntity<>(error,HttpStatus.NOT_FOUND);
     }

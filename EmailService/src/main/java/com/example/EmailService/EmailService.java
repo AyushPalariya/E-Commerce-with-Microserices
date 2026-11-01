@@ -68,12 +68,11 @@ public class EmailService {
                 .append("Thank you for placing your order!\n\n")
                 .append("Your Order Details:\n\n");
         List<ItemDto> list=orderPlace.getItems();
-        orderDetails.append("   " + "Name" + "\t" + "\tQuantities" + "\t" + "amount" + "\n");
+        orderDetails.append("   " + "Name" + "\t\t\t\t\t" + "Quantities" + "\t\t" + "Amount" + "\n");
         for (int i = 0; i < list.size(); i++) {
-
             orderDetails .append(i + 1).append(". ").append(list.get(i).getProduct_name())
-                    .append("\t").append("  ").append(list.get(i).getQuantities())
-                    .append("\t").append("  ").append(list.get(i).getSubAmount()).append("\n");
+                    .append("\t\t\t").append(list.get(i).getQuantities())
+                    .append("\t\t\t").append(list.get(i).getSubAmount()).append("\n");
         }
 
         orderDetails.append("Total Amount: ")
@@ -81,7 +80,7 @@ public class EmailService {
                 .append("\n\n")
                 .append("Thank you for shopping with us!");
         System.out.println(orderDetails);
-        helper.setText(orderDetails.toString());
+        helper.setText(orderDetails.toString(),false);
         //also generate pdf and send to mail_id
         javaMailSender.send(mimeMessage);
     }

@@ -5,6 +5,7 @@ import com.example.OrderService.Dto.ItemDto;
 import com.example.OrderService.Entities.OrderEntity;
 import com.example.OrderService.Entities.OrderItem;
 import com.example.OrderService.Entities.Status;
+import com.example.OrderService.Exception.BadRequestException;
 import com.example.OrderService.Repository.OrderRepo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 @Slf4j
 @Service
@@ -31,6 +33,7 @@ public class OrderService {
     @CacheEvict(value = "userOrder",allEntries = true)
     @Transactional
     public OrderPlace orderPlace(OrderPlace orderPlace,String email,Long id){
+        validateOrder(orderPlace, email, id);
         OrderEntity order = new OrderEntity();
         order.setUserId(id);
         order.setUserEmail(email);
@@ -70,11 +73,13 @@ public class OrderService {
         OrderPlace orderPlace1 = new OrderPlace(save.getId(), save.getUserId(), save.getUserEmail(), orderPlace.getName(),
                 save.getTotalAmount(), String.valueOf(save.getStatus()), save.getDatetime(), itemDto);
         try {
-            template.send(topic, email, orderPlace1);
-            System.out.println("send email to emailService for order placed");
-        } catch (Exception e) {
-            System.out.println("email service not work for orderPlaced!");
-            System.out.println(e.getMessage());
+            template.send(topic, email, orderPlace1).get();
+            log.info("Order notification published for orderId={}", save.getId());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while publishing order notification", e);
+        } catch (ExecutionException e) {
+            throw new IllegalStateException("Failed to publish order notification", e.getCause());
         }
 
         return orderPlace1;
@@ -88,8 +93,33 @@ public class OrderService {
     @Cacheable(value = "userOrder",key = "#userId")
     @Transactional(readOnly = true)
     public List<OrderPlace> getOrderByUserId(Long userId) {
+        if (userId == null || userId <= 0) throw new BadRequestException("User id must be positive!");
         List<OrderEntity> orders = orderRepo.findOrdersByUserIdWithItems(userId);
         return convertInDto(orders);
+    }
+
+    private void validateOrder(OrderPlace orderPlace, String email, Long userId) {
+        if (orderPlace == null) throw new BadRequestException("Order details are required!");
+        if (email == null || email.isBlank()) throw new BadRequestException("Authenticated user email is required!");
+        if (userId == null || userId <= 0) throw new BadRequestException("Authenticated user id must be positive!");
+        if (orderPlace.getName() == null || orderPlace.getName().isBlank())
+            throw new BadRequestException("Customer name is required!");
+        if (orderPlace.getTotalAmount() == null || !Double.isFinite(orderPlace.getTotalAmount())
+                || orderPlace.getTotalAmount() < 0)
+            throw new BadRequestException("Order total must be a non-negative number!");
+        if (orderPlace.getItems() == null || orderPlace.getItems().isEmpty())
+            throw new BadRequestException("An order must contain at least one item!");
+        for (ItemDto item : orderPlace.getItems()) {
+            if (item == null) throw new BadRequestException("Order item details are required!");
+            if (item.getProduct_id() == null || item.getProduct_id() <= 0)
+                throw new BadRequestException("Each order item must have a positive product id!");
+            if (item.getProduct_name() == null || item.getProduct_name().isBlank())
+                throw new BadRequestException("Each order item must have a product name!");
+            if (item.getQuantities() <= 0)
+                throw new BadRequestException("Each order item quantity must be positive!");
+            if (!Double.isFinite(item.getSubAmount()) || item.getSubAmount() < 0)
+                throw new BadRequestException("Each order item amount must be a non-negative number!");
+        }
     }
 
     public List<OrderPlace> convertInDto(List<OrderEntity> all){

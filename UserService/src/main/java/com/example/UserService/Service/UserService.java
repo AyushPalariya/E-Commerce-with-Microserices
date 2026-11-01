@@ -2,23 +2,20 @@ package com.example.UserService.Service;
 
 import com.example.UserService.DTO.ProfileRequest;
 import com.example.UserService.Entities.UserProfile;
-import com.example.UserService.GlobalExcep.BadCredentialClass;
+import com.example.UserService.GlobalExcep.BadRequestException;
 import com.example.UserService.GlobalExcep.ConflictException;
+import com.example.UserService.GlobalExcep.NotFoundException;
+import com.example.UserService.Repository.FeignClientInterface;
 import com.example.UserService.Repository.UserRepo;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.NotFoundException;
 import lombok.Data;
-import org.apache.catalina.authenticator.BasicAuthenticator;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+
 
 import java.util.List;
 import java.util.Map;
@@ -29,18 +26,22 @@ import java.util.Map;
 public class UserService {
     @Autowired
     private UserRepo userRepo;
-    @Autowired
-    private WebClient webClient;
+    @Autowired (required = true)
+    private FeignClientInterface feignClientInterface;
     @Autowired
     private CacheManager cacheManager;
 
 
     @Transactional
     public String  createProfile(ProfileRequest profile) {
-        if(profile.getId()==null) throw new BadCredentialClass("Id is required!");
-        if(profile.getName()==null||profile.getName().isBlank()) throw new BadCredentialClass("Name is required!");
-        if(profile.getEmail()==null||profile.getEmail().isBlank()) throw new BadCredentialClass("email is required!");
-        if(profile.getPhone_no()==null||profile.getPhone_no().isBlank()) throw new BadCredentialClass("phone_no is required!");
+        if (profile == null) throw new BadRequestException("Profile details are required!");
+        if(profile.getId()==null) throw new BadRequestException("Id is required!");
+        if(profile.getId() <= 0) throw new BadRequestException("Id must be positive!");
+        if(profile.getName()==null||profile.getName().isBlank()) throw new BadRequestException("Name is required!");
+        if(profile.getEmail()==null||profile.getEmail().isBlank()) throw new BadRequestException("email is required!");
+        if(profile.getPhone_no()==null||profile.getPhone_no().isBlank()) throw new BadRequestException("phone_no is required!");
+        if(userRepo.existsById(profile.getId())) throw new ConflictException("Profile already exists for user id: " + profile.getId());
+        if(userRepo.existsByEmail(profile.getEmail())) throw new ConflictException("Profile already exists for email: " + profile.getEmail());
         UserProfile userProfile=new UserProfile(profile.getId(), profile.getName(),profile.getEmail(),profile.getPhone_no());
         System.out.println("userId"+userProfile.getId());
         userRepo.save(userProfile);
@@ -63,8 +64,9 @@ public class UserService {
 
     @Cacheable(value = "profile",key="#email")
     public UserProfile getProfileByEmail(String email) {
+        if (email == null || email.isBlank()) throw new BadRequestException("Email is required!");
         return userRepo.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("User Profile not found!"));
+                .orElseThrow(() -> new NotFoundException("User profile not found for email: " + email));
     }
 
     public List<UserProfile> getAllUserProfile(){
@@ -72,21 +74,19 @@ public class UserService {
     }
     @Transactional
     @CacheEvict(value = "profile",key="#email")
-    public void deleteUser(String email){
-        if(!userRepo.existsByEmail(email)) throw new BadCredentialClass("Email not found!");
-        String s=webClientMethod(email);
+    public ResponseEntity<String> deleteUser(String email){
+        if (email == null || email.isBlank()) throw new BadRequestException("Email is required!");
+        if(!userRepo.existsByEmail(email)) throw new NotFoundException("User profile not found for email: " + email);
+        ResponseEntity<String> s=webClientMethod(email);
         System.out.println(s);
         userRepo.deleteByEmail(email);
         System.out.println("User Profile is deleted from UserService with "+email);
+        return s;
     }
 
-    private String webClientMethod(String email) {
+    private ResponseEntity<String> webClientMethod(String email) {
         System.out.println(email);
-        return webClient.delete()
-                .uri("http://localhost:8082/auth/delete/{email}",email)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
+        return feignClientInterface.deleteUser(email);
     }
 
 }

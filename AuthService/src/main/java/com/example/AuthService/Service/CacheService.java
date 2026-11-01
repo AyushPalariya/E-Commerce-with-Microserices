@@ -6,8 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.userdetails.User;
+import com.example.AuthService.GlobalException.NotFoundClass;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -64,7 +63,11 @@ public class CacheService {
     }
 
     @Cacheable(value = "AuthUserEntity",key = "#email")
-    public AuthUserEntity getData(String email){
-        return authRepo.findByEmail(email).orElseThrow(() -> new BadCredentialsException("Please check your mail!"));
+    public AuthUserEntity getAuthUser(String email){
+        return authRepo.findByEmail(email).orElseThrow(() -> new NotFoundClass("User not found for email: " + email));
+    }
+    @CacheEvict(value = "AuthUserEntity",key = "#email")
+    public void removeAuthUser(String email) {
+        System.out.println("auth user remove from cache.");
     }
 }

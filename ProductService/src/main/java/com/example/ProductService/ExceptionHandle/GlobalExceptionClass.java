@@ -18,12 +18,12 @@ public class GlobalExceptionClass {
     }
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiError> handleBadRequest(BadRequestException ex, HttpServletRequest req){
-        ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.NOT_FOUND,ex.getMessage(),"Bad request!",req.getRequestURI());
+        ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.BAD_REQUEST,"Bad request",ex.getMessage(),req.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiError> handleConflict(ConflictException ex,HttpServletRequest req){
-        ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.NOT_FOUND,ex.getMessage(),"Conflict occurs!",req.getRequestURI());
+        ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.CONFLICT,"Conflict",ex.getMessage(),req.getRequestURI());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 }

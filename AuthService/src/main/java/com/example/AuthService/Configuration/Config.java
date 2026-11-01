@@ -3,6 +3,7 @@ package com.example.AuthService.Configuration;
 import org.aspectj.weaver.tools.cache.CacheFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -36,8 +37,4 @@ public class Config {
         return new LettuceConnectionFactory(host,port);
     }
 
-    @Bean
-    public RestClient restclient(){
-        return RestClient.builder().build();
-    }
 }

@@ -13,8 +13,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class ProductService {
@@ -22,18 +24,23 @@ public class ProductService {
     private ProductRepo productRepo;
     @CacheEvict(value = "product", allEntries = true)
     public List<Product> addProduct(List<Product> products) {
+        if (products == null || products.isEmpty()) throw new BadRequestException("At least one product is required!");
         List<Products> pp=new ArrayList<>();
+        Set<String> names = new HashSet<>();
         for (Product product : products) {
-            if (product.getAmount() == null) throw new BadRequestException("amount required!");
+            if (product == null) throw new BadRequestException("Product details are required!");
+            if (product.getAmount() == null || !Double.isFinite(product.getAmount()) || product.getAmount() < 0)
+                throw new BadRequestException("Amount must be a non-negative number!");
             if (product.getCategory() == null || product.getCategory().isBlank())
                 throw new BadRequestException("category is required!");
             if (product.getDescription() == null || product.getDescription().isBlank())
-                throw new BadRequestException("category is required!");
+                throw new BadRequestException("Description is required!");
             if (product.getName() == null || product.getName().isBlank())
                 throw new BadRequestException("name is required!");
             if (product.getImg() == null || product.getImg().isBlank())
                 throw new BadRequestException("img is required!");
-            if (productRepo.existsByName(product.getName())) throw new ConflictException("name already exist!");
+            if (!names.add(product.getName()) || productRepo.existsByName(product.getName()))
+                throw new ConflictException("Product name already exists: " + product.getName());
             Products p = new Products(product.getCategory(), product.getDescription(), product.getImg(), product.getAmount(), product.getName());
             pp.add(p);
         }
@@ -45,6 +52,7 @@ public class ProductService {
 
     @Cacheable(value = "product",key="#id")
     public Product getProduct(Long id){
+        if (id == null || id <= 0) throw new BadRequestException("Product id must be positive!");
         Products p= productRepo.findById(id).orElseThrow(()->new ResourceNotFound("Product not found with id: "+id));
         return new Product(p.getId(),p.getCategory(),p.getDescription(),p.getImg(),p.getAmount(), p.getName());
     }
@@ -64,6 +72,7 @@ public class ProductService {
 
     @CacheEvict(value = "product",key = "#id")
     public Map<String,String> deleteProduct(Long id){
+        if (id == null || id <= 0) throw new BadRequestException("Product id must be positive!");
         if(!productRepo.existsById(id)) throw new ResourceNotFound("Product not found with id: "+id);
         productRepo.deleteById(id);
         System.out.println("product deleted!");
@@ -80,5 +89,4 @@ public class ProductService {
     public void clearProductCache() {
         System.out.println("Product cache cleared!");
     }
-
 }
