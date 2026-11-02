@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 public class ItemDto {
     private Long id;//include in response
     private Long product_id;
-    private String product_name;
+    private String product_name;//include in response
     private int quantities;
-    private double subAmount;
+    private Double subAmount;//include in response
 }

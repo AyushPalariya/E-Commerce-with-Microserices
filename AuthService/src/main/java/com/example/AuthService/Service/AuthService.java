@@ -81,26 +81,17 @@ public class AuthService {
         ResponseEntity<String> s = sendData(u);
         if (s == null || !s.getStatusCode().is2xxSuccessful())
             throw new IllegalStateException("Profile service did not create the user profile");
-        try {
-            var result = template.send(
-                    topicName,
-                    String.valueOf(u.getId()),
-                    new RegistrationEmailEvent(
-                            u.getId(),
-                            u.getName(),
-                            u.getEmail(),
-                            u.getPhone_no(),
-                            u.getRole().toString()
-                    )
-            ).get();
-            log.info("Registration email event published for userId={} at offset={}",
-                    u.getId(), result.getRecordMetadata().offset());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while publishing registration email event", e);
-        } catch (ExecutionException e) {
-            throw new IllegalStateException("Failed to publish registration email event", e.getCause());
-        }
+        template.send(
+                topicName,
+                String.valueOf(u.getId()),
+                new RegistrationEmailEvent(
+                        u.getId(),
+                        u.getName(),
+                        u.getEmail(),
+                        u.getPhone_no(),
+                        u.getRole().toString()
+                )
+        );
         return new UserRegistration(u.getId(), u.getName(), u.getPassword(), u.getEmail(), u.getPhone_no(), u.getEnable(), u.getRole(), u.getCreatedAt(), u.getUpdatedAt());
     }
 
@@ -221,18 +212,11 @@ public class AuthService {
         String otp=cacheService.generateOtp(email);
         forget.setOtp(otp);
 
-        try {
-            template.send(resetTopic, email, forget).get();
-            log.info("Password reset email event published for email={}", email);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while publishing password reset email event", e);
-        } catch (ExecutionException e) {
-            throw new IllegalStateException("Failed to publish password reset email event", e.getCause());
-        }
+        template.send(resetTopic, email, forget);
 
         return Map.of("email", email,"datetime",String.valueOf(LocalDateTime.now().plusMinutes(5)));
     }
+
     @Transactional
     public Map<String, String> resetPassword(PasswordResetRequest request) {
         if (request == null) throw new BadRequestExceptionClass("Password reset details are required!");

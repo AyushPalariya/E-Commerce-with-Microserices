@@ -30,8 +30,8 @@ public class ProductController {
     public ResponseEntity<Product> getProduct(@PathVariable Long id){
         return ResponseEntity.status(HttpStatus.OK).body(productService.getProduct(id));
     }
-    @PostMapping("/update/{id}")
-    public ResponseEntity<Product> updateProduct(@PathVariable Long id, Map<String,Object> mp){
+    @PatchMapping("/update/{id}")
+    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @RequestBody Map<String,Object> mp){
         return new ResponseEntity<>(productService.updateProduct(id,mp),HttpStatus.OK);
     }
     @DeleteMapping("/delete/{id}")
@@ -42,5 +42,9 @@ public class ProductController {
     public ResponseEntity<Void> deleteCacheData(){
         productService.clearProductCache();
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+    @PostMapping("/bulk")
+    public ResponseEntity<List<Product>> getProductwithIds(@RequestBody List<Long> ids){
+        return ResponseEntity.ok().body(productService.getAllProductsById(ids));
     }
 }

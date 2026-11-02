@@ -16,6 +16,4 @@ public class Product implements Serializable {
     private String img;
     private Double amount;
     private String name;
-
-
 }

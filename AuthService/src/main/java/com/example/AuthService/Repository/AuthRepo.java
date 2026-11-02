@@ -27,4 +27,5 @@ public interface AuthRepo extends JpaRepository<AuthUserEntity,Long> {
     int savePasswordByEmail(@Param("email") String email,
                              @Param("password") String confirmPassword,
                              @Param("updatedAt") LocalDateTime updatedAt);
+
 }

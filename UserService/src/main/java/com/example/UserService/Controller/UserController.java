@@ -41,7 +41,7 @@ public class UserController {
         return ResponseEntity.noContent().headers(headers -> headers.addAll(auth.getHeaders())).build();
         //or
 //        HttpHeaders headers = new HttpHeaders();
-//        headers.put(HttpHeaders.SET_COOKIE,
+//        headers.add(HttpHeaders.SET_COOKIE,
 //                auth.getHeaders().get(HttpHeaders.SET_COOKIE));
 //        return new ResponseEntity<>(headers, HttpStatus.NO_CONTENT);
     }

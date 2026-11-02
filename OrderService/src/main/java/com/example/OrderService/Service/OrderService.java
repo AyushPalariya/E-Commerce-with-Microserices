@@ -2,10 +2,13 @@ package com.example.OrderService.Service;
 
 import com.example.OrderService.Dto.OrderPlace;
 import com.example.OrderService.Dto.ItemDto;
+import com.example.OrderService.Dto.PaymentOrderDto;
+import com.example.OrderService.Dto.ProductDto;
 import com.example.OrderService.Entities.OrderEntity;
 import com.example.OrderService.Entities.OrderItem;
 import com.example.OrderService.Entities.Status;
 import com.example.OrderService.Exception.BadRequestException;
+import com.example.OrderService.Repository.FeignClientInterface;
 import com.example.OrderService.Repository.OrderRepo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Slf4j
@@ -30,35 +35,50 @@ public class OrderService {
     private KafkaTemplate<String,OrderPlace> template;
     @Value("${kafka.topic.order}")
     private String topic;
+    @Autowired
+    private FeignClientInterface feignClientInterface;
     @CacheEvict(value = "userOrder",allEntries = true)
     @Transactional
     public OrderPlace orderPlace(OrderPlace orderPlace,String email,Long id){
         validateOrder(orderPlace, email, id);
+        List<Long> product_ids=orderPlace.getItems().stream().map(ItemDto::getProduct_id).distinct().toList();
+        List<ProductDto> products= feignClientInterface.getProducts(product_ids).getBody();
+        if (products == null || products.isEmpty()) {
+            throw new BadRequestException("Products not found");
+        }
+        System.out.println(product_ids);
+        Map<Long,ProductDto> productMap=new HashMap<>();
+        for(ProductDto p:products) {
+            System.out.print(p.getId()+" ");
+            productMap.put(p.getId(),p);
+        }
+
+
         OrderEntity order = new OrderEntity();
         order.setUserId(id);
         order.setUserEmail(email);
         order.setUserName(orderPlace.getName());
         order.setDatetime(LocalDateTime.now());
-        order.setStatus(Status.PLACED);
-        order.setTotalAmount(orderPlace.getTotalAmount());
+        order.setStatus(Status.PAYMENT_PENDING);
 
         List<OrderItem> items = new ArrayList<>();
+        double totalAmount=0.0;
         for (ItemDto itemDto : orderPlace.getItems()) {
-
+            ProductDto product=productMap.get(itemDto.getProduct_id());
+            if (product == null) throw new BadRequestException("Product not found: " + itemDto.getProduct_id());
+            double subtotal=product.getAmount()*itemDto.getQuantities();
+            totalAmount+=subtotal;
             OrderItem item = new OrderItem();
-            item.setProduct_id(itemDto.getProduct_id());
-            item.setProduct_name(itemDto.getProduct_name());
+            item.setProduct_id(product.getId());
+            item.setProduct_name(product.getName());
             item.setQuantities(itemDto.getQuantities());
-            item.setSubAmount(itemDto.getSubAmount());
+            item.setSubAmount(subtotal);
             item.setOrder(order);
             log.info(item.getOrder().toString());
             items.add(item);
         }
         order.setItems(items);
-
-        /*
-         payment service,when complete then
-         */
+        order.setTotalAmount(totalAmount);
 
         OrderEntity save = orderRepo.save(order);
         List<ItemDto> itemDto=save.getItems().stream().map(item -> {
@@ -73,13 +93,11 @@ public class OrderService {
         OrderPlace orderPlace1 = new OrderPlace(save.getId(), save.getUserId(), save.getUserEmail(), orderPlace.getName(),
                 save.getTotalAmount(), String.valueOf(save.getStatus()), save.getDatetime(), itemDto);
         try {
-            template.send(topic, email, orderPlace1).get();
-            log.info("Order notification published for orderId={}", save.getId());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while publishing order notification", e);
-        } catch (ExecutionException e) {
-            throw new IllegalStateException("Failed to publish order notification", e.getCause());
+            template.send(topic, email, orderPlace1);
+            System.out.println("email send of orderPlace to "+email);
+        }
+        catch (Exception e){
+            System.out.println("email not send for order place with email :"+email);
         }
 
         return orderPlace1;
@@ -104,21 +122,14 @@ public class OrderService {
         if (userId == null || userId <= 0) throw new BadRequestException("Authenticated user id must be positive!");
         if (orderPlace.getName() == null || orderPlace.getName().isBlank())
             throw new BadRequestException("Customer name is required!");
-        if (orderPlace.getTotalAmount() == null || !Double.isFinite(orderPlace.getTotalAmount())
-                || orderPlace.getTotalAmount() < 0)
-            throw new BadRequestException("Order total must be a non-negative number!");
         if (orderPlace.getItems() == null || orderPlace.getItems().isEmpty())
             throw new BadRequestException("An order must contain at least one item!");
         for (ItemDto item : orderPlace.getItems()) {
             if (item == null) throw new BadRequestException("Order item details are required!");
             if (item.getProduct_id() == null || item.getProduct_id() <= 0)
                 throw new BadRequestException("Each order item must have a positive product id!");
-            if (item.getProduct_name() == null || item.getProduct_name().isBlank())
-                throw new BadRequestException("Each order item must have a product name!");
             if (item.getQuantities() <= 0)
                 throw new BadRequestException("Each order item quantity must be positive!");
-            if (!Double.isFinite(item.getSubAmount()) || item.getSubAmount() < 0)
-                throw new BadRequestException("Each order item amount must be a non-negative number!");
         }
     }
 
@@ -133,5 +144,17 @@ public class OrderService {
         }
         return place;
     }
+    @CacheEvict(value = "userOrder",key = "#userId")
+    public void deleteOrder(Long orderId,Long userId) {
+        orderRepo.deleteById(orderId);
+        System.out.println("order delete with orderId:"+orderId);
+    }
 
+    public PaymentOrderDto getOrderWithStatusAndAmount(Long orderId, Long userId, String email) {
+        OrderEntity orderEntity = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found! "));
+        if(!orderEntity.getUserId().equals(userId)) throw new BadRequestException("userId "+userId+" is not matches with orderEntity userId !");
+        if(!orderEntity.getUserEmail().equals(email)) throw new BadRequestException(email+" is not matches with orderEntity email!");
+        if(!Status.PAYMENT_PENDING.equals(orderEntity.getStatus())) throw new BadRequestException("status is not matches with orderEntity status!");
+        return new PaymentOrderDto(orderEntity.getTotalAmount(),orderEntity.getStatus().name());
+    }
 }

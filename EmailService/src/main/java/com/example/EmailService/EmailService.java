@@ -64,17 +64,17 @@ public class EmailService {
         StringBuilder orderDetails = new StringBuilder();
 
         orderDetails.append("Hello ").append(orderPlace.getName())
-                .append(",\n\n")
-                .append("Thank you for placing your order!\n\n")
+                .append(",\n")
+                .append("Thank you for placing your order!\n")
                 .append("Your Order Details:\n\n");
         List<ItemDto> list=orderPlace.getItems();
-        orderDetails.append("   " + "Name" + "\t\t\t\t\t" + "Quantities" + "\t\t" + "Amount" + "\n");
         for (int i = 0; i < list.size(); i++) {
-            orderDetails .append(i + 1).append(". ").append(list.get(i).getProduct_name())
-                    .append("\t\t\t").append(list.get(i).getQuantities())
-                    .append("\t\t\t").append(list.get(i).getSubAmount()).append("\n");
+            ItemDto item = list.get(i);
+            orderDetails.append(i + 1).append(". ")
+                    .append(item.getProduct_name()).append("\n")
+                    .append("   Quantity: ").append(item.getQuantities()).append("\n")
+                    .append("   Amount: ₹").append(item.getSubAmount()).append("\n\n");
         }
-
         orderDetails.append("Total Amount: ")
                 .append(orderPlace.getTotalAmount())
                 .append("\n\n")

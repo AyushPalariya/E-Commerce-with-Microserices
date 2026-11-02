@@ -1,10 +1,12 @@
 package com.example.OrderService.Controller;
 
 import com.example.OrderService.Dto.OrderPlace;
+import com.example.OrderService.Dto.PaymentOrderDto;
 import com.example.OrderService.Entities.OrderEntity;
 import com.example.OrderService.Service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -41,4 +43,13 @@ public class OrderController {
         return ResponseEntity.ok().body(port);
     }
 
+    @DeleteMapping("/delete/{orderId}")
+    public ResponseEntity<Void> deleteOrder(@PathVariable Long orderId,@RequestHeader("X-Authenticated-User-Id") Long userId){
+        orderService.deleteOrder(orderId,userId);
+        return ResponseEntity.noContent().build();
+    }
+    @GetMapping("/internal/{orderId}")
+    public ResponseEntity<PaymentOrderDto> getOrderWithStatusAndAmount(Long orderId,Long userId,String email){
+        return new ResponseEntity<>(orderService.getOrderWithStatusAndAmount(orderId,userId,email), HttpStatus.OK);
+    }
 }

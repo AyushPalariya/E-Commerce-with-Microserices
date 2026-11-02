@@ -89,4 +89,12 @@ public class ProductService {
     public void clearProductCache() {
         System.out.println("Product cache cleared!");
     }
+
+
+    public List<Product> getAllProductsById(List<Long> ids) {
+        List<Products> allById = productRepo.findAllById(ids);
+        return allById.stream().map(product->new Product(product.getId(), product.getCategory(),
+                product.getDescription(), product.getImg(), product.getAmount(), product.getName()))
+                .toList();
+    }
 }

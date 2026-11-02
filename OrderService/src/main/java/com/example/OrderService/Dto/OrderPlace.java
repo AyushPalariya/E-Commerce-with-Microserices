@@ -21,7 +21,7 @@ public class OrderPlace implements Serializable {
     private Long userId;//include in response
     private String userEmail;//include in response
     private String name;
-    private Double totalAmount;
+    private Double totalAmount;//include in response
     private String status;//include in response
     private LocalDateTime datetime;//include in response
     private List<ItemDto> items;
