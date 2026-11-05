@@ -22,4 +22,9 @@ public class GlobalExceptionHandler {
         ApiError e=new ApiError(LocalDateTime.now(), HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), "Payment Gateway Error",req.getRequestURI());
         return new ResponseEntity<>(e,HttpStatus.INTERNAL_SERVER_ERROR);
     }
+    @ExceptionHandler(RazorpayExceptionClass.class)
+    public ResponseEntity<ApiError> handleRazorpay(RazorpayExceptionClass ex, HttpServletRequest req){
+        ApiError e=new ApiError(LocalDateTime.now(), HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), "Payment Gateway Error",req.getRequestURI());
+        return new ResponseEntity<>(e,HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 }

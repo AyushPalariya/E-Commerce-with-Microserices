@@ -1,9 +1,6 @@
 package com.example.OrderService.Service;
 
-import com.example.OrderService.Dto.OrderPlace;
-import com.example.OrderService.Dto.ItemDto;
-import com.example.OrderService.Dto.PaymentOrderDto;
-import com.example.OrderService.Dto.ProductDto;
+import com.example.OrderService.Dto.*;
 import com.example.OrderService.Entities.OrderEntity;
 import com.example.OrderService.Entities.OrderItem;
 import com.example.OrderService.Entities.Status;
@@ -15,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.kafka.core.KafkaTemplate;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,34 +28,34 @@ import java.util.concurrent.ExecutionException;
 public class OrderService {
     @Autowired
     private OrderRepo orderRepo;
-    @Autowired
-    private KafkaTemplate<String,OrderPlace> template;
-    @Value("${kafka.topic.order}")
-    private String topic;
+
     @Autowired
     private FeignClientInterface feignClientInterface;
     @CacheEvict(value = "userOrder",allEntries = true)
     @Transactional
-    public OrderPlace orderPlace(OrderPlace orderPlace,String email,Long id){
-        validateOrder(orderPlace, email, id);
+    public OrderPlace orderPlace(OrderPlace orderPlace,String email,Long userid){
+        validateOrder(orderPlace, email, userid);
         List<Long> product_ids=orderPlace.getItems().stream().map(ItemDto::getProduct_id).distinct().toList();
         List<ProductDto> products= feignClientInterface.getProducts(product_ids).getBody();
+
         if (products == null || products.isEmpty()) {
             throw new BadRequestException("Products not found");
         }
-        System.out.println(product_ids);
+        log.info("item ids: {}",product_ids);
+        log.info("Product get from Product Service: {}",products);
+
         Map<Long,ProductDto> productMap=new HashMap<>();
         for(ProductDto p:products) {
             System.out.print(p.getId()+" ");
             productMap.put(p.getId(),p);
         }
+        System.out.println(productMap);
 
 
         OrderEntity order = new OrderEntity();
-        order.setUserId(id);
+        order.setUserId(userid);
         order.setUserEmail(email);
         order.setUserName(orderPlace.getName());
-        order.setDatetime(LocalDateTime.now());
         order.setStatus(Status.PAYMENT_PENDING);
 
         List<OrderItem> items = new ArrayList<>();
@@ -92,13 +89,6 @@ public class OrderService {
         }).toList();
         OrderPlace orderPlace1 = new OrderPlace(save.getId(), save.getUserId(), save.getUserEmail(), orderPlace.getName(),
                 save.getTotalAmount(), String.valueOf(save.getStatus()), save.getDatetime(), itemDto);
-        try {
-            template.send(topic, email, orderPlace1);
-            System.out.println("email send of orderPlace to "+email);
-        }
-        catch (Exception e){
-            System.out.println("email not send for order place with email :"+email);
-        }
 
         return orderPlace1;
     }
@@ -150,11 +140,13 @@ public class OrderService {
         System.out.println("order delete with orderId:"+orderId);
     }
 
-    public PaymentOrderDto getOrderWithStatusAndAmount(Long orderId, Long userId, String email) {
+    public OrderPlace getOrder(Long orderId, UserDetailsDto user) {
         OrderEntity orderEntity = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found! "));
-        if(!orderEntity.getUserId().equals(userId)) throw new BadRequestException("userId "+userId+" is not matches with orderEntity userId !");
-        if(!orderEntity.getUserEmail().equals(email)) throw new BadRequestException(email+" is not matches with orderEntity email!");
-        if(!Status.PAYMENT_PENDING.equals(orderEntity.getStatus())) throw new BadRequestException("status is not matches with orderEntity status!");
-        return new PaymentOrderDto(orderEntity.getTotalAmount(),orderEntity.getStatus().name());
+        if(!orderEntity.getUserId().equals(user.getUserId())) throw new BadRequestException("userId "+user.getUserId()+" is not matches with orderEntity userId !");
+        if(!orderEntity.getUserEmail().equals(user.getEmail())) throw new BadRequestException("email "+user.getEmail()+" is not matches with orderEntity email!");
+        if(Status.PAYMENT_PENDING!=orderEntity.getStatus()) throw new BadRequestException("status is not matches with orderEntity status!");
+        List<OrderPlace> orderPlaces = convertInDto(List.of(orderEntity));
+        System.out.println("Payment want this order: "+orderPlaces);
+        return orderPlaces.get(0);
     }
 }

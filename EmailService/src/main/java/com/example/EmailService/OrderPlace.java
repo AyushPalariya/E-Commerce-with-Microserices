@@ -12,12 +12,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrderPlace implements Serializable {
-    private Long orderId;//include in response
-    private Long userId;//include in response
-    private String userEmail;//include in response
+    private Long orderId;
+    private Long userId;
+    private String userEmail;
     private String name;
     private Double totalAmount;
-    private String status;//include in response
-    private LocalDateTime datetime;//include in response
+    private String status;
+    private LocalDateTime datetime;
     private List<ItemDto> items;
 }

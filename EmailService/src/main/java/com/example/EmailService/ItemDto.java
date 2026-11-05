@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ItemDto {
-    private Long id;//include in response
+    private Long id;
     private Long product_id;
     private String product_name;
     private int quantities;

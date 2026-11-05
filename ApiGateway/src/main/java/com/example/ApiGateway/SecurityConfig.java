@@ -21,6 +21,15 @@ import java.util.Map;
 public class SecurityConfig {
     @Autowired
     private JwtFilter jwtFilter;
+    private String[] publicUrls=
+            {       //after testing products define role ADMIN
+                    "/products/**",
+                    "/auth/**",
+                    //after testing user/getAllProfile and order/getAllOrders define role ADMIN
+                    "/user/getAllProfile",
+                    "/order/getAllOrders",
+                    "/payment/webhooks"
+            };
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity){
         httpSecurity.csrf((csrf)->csrf.disable())
@@ -30,10 +39,7 @@ public class SecurityConfig {
                 .sessionManagement((sm)->sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(req->req
                         .requestMatchers("/auth/delete/{email}").hasAnyRole("USER","ADMIN")
-                        .requestMatchers("/products/**").permitAll()//after testing define role ADMIN
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/user/getAllProfile").permitAll()//after testing define role ADMIN
-                        .requestMatchers("/order/getAllOrders").permitAll()//after testing define role ADMIN
+                        .requestMatchers(publicUrls).permitAll()
                         .requestMatchers("/user/**").hasAnyRole("ADMIN","USER")
                         .requestMatchers("/order/**").hasAnyRole("USER","ADMIN")
                         .requestMatchers("/payment/**").hasAnyRole("USER","ADMIN")
@@ -41,6 +47,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .exceptionHandling(ex->ex.authenticationEntryPoint((request, response, authException) ->
                 {
+
                     response.setStatus(HttpStatus.UNAUTHORIZED.value());
                     response.setContentType("application/json");
                     String message = "Unauthorized: " + authException.getMessage();

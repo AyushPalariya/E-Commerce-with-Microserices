@@ -1,46 +1,72 @@
 package com.example.PaymentService.Service;
 
-import com.example.PaymentService.Dto.PaymentOrderDto;
-import com.example.PaymentService.Dto.PaymentResponseDto;
+import com.example.PaymentService.Dto.*;
+import com.example.PaymentService.Dto.PaymentPackage.PaymentPayLoad;
 import com.example.PaymentService.Entities.PaymentEntity;
 import com.example.PaymentService.Entities.Status;
 import com.example.PaymentService.GlobalException.BadRequestExceptionClass;
-import com.example.PaymentService.Repository.FeignClientInterface;
+import com.example.PaymentService.GlobalException.RazorpayExceptionClass;
 import com.example.PaymentService.Repository.PaymentRepo;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
+import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class PaymentService {
     @Autowired
-    private FeignClientInterface feignClientInterface;
+    private KafkaTemplate<String, OrderPaymentEmail> template;
+    @Value("${kafka.topic.order}")
+    private String topic;
+    @Autowired
+    private CacheService cacheService;
     @Autowired
     private RazorpayClient razorpayClient;
     @Autowired
     private PaymentRepo paymentRepo;
     @Value("${razorpay.key.id}")
     private String keyId;
+
+    @Transactional
     public PaymentResponseDto create(Long orderId, Long userId, String email) throws RazorpayException {
         validate(orderId,userId,email);
-        PaymentOrderDto paymentOrder = feignClientInterface.getOrderStatusAndAmount(orderId, userId, email).getBody();
 
-            JSONObject order=new JSONObject();
+        Optional<PaymentEntity> byOrderId = paymentRepo.findByOrderId(orderId);
+        if(byOrderId.isPresent()){
+            PaymentEntity pp=byOrderId.get();
+            log.info("payment retry for orderId {}",pp.getOrderId());
+            if(pp.getStatus()==Status.SUCCESS) throw new RazorpayExceptionClass("Payment already done for this order!");
+            return new PaymentResponseDto(pp.getRaz_order_id(), pp.getAmount()*100, keyId);
+        }
+
+        UserDetailsDto userDetails=new UserDetailsDto(email,userId);
+        //cache to get orderPlace
+        OrderPlace paymentOrder = cacheService.putOrderPlace(orderId, userDetails);
+
+        JSONObject order=new JSONObject();
             order.put("amount",paymentOrder.getTotalAmount()*100);
             order.put("currency","INR");
             order.put("receipt","txn_"+ UUID.randomUUID());
             Order orderDetails = razorpayClient.orders.create(order);
             String raz_order_id=orderDetails.get("id");
+            log.info("razorpayOrderId:{}",raz_order_id);
+            log.info("amount:{}",(Integer)orderDetails.get("amount"));
+            log.info("currency:{}",(String)orderDetails.get("currency"));
             PaymentEntity p=new PaymentEntity(orderId,raz_order_id,paymentOrder.getTotalAmount(), Status.PENDING,email,userId);
             PaymentEntity save = paymentRepo.save(p);
-            return new PaymentResponseDto(raz_order_id, save.getAmount(), keyId);
+            log.info("new payment for orderId:{}",save.getOrderId());
+            return new PaymentResponseDto(raz_order_id, save.getAmount()*100, keyId);
     }
 
     private void validate(Long orderId, Long userId, String email) {
@@ -48,5 +74,49 @@ public class PaymentService {
         if(userId==null||userId<=0) throw new BadRequestExceptionClass("userId must be greater than zero!");
         if(email==null||email.isBlank()) throw new BadRequestExceptionClass("email is required!");
     }
+    @Transactional
+    public void verify(String signature, PaymentPayLoad payload) {
 
+        log.info("Payload {}",payload);
+        String raz_status = payload.getPayload().getPayment().getEntity().getStatus();
+        log.info("Status :{}",raz_status);
+        String raz_orderId = payload.getPayload().getPayment().getEntity().getOrder_id();
+        log.info("OrderId: {}",raz_orderId);
+        String raz_paymentId= payload.getPayload().getPayment().getEntity().getId();
+        log.info("PaymentId:{}",raz_paymentId);
+        log.info("Signature {}",signature);
+
+        emailMethodAndUpdate(raz_status,raz_orderId,raz_paymentId);
+
+    }
+
+    private void emailMethodAndUpdate(String raz_status, String raz_orderId, String raz_paymentId) {
+        int update=999;
+
+        if(raz_status.equals("failed")){
+            update = paymentRepo.setStatusAndPaymentId(Status.FAILED,LocalDateTime.now(), raz_paymentId,raz_orderId);
+        }
+        else if(raz_status.equals("captured")){
+            PaymentStatusOrder result = paymentRepo.findOrderIdAndStatus(raz_orderId).orElseThrow();
+            Long orderId =result.getOrderId();
+            System.out.println(orderId);
+            System.out.println(result.getStatus());
+            if(result.getStatus()==Status.SUCCESS) return ;
+            update=paymentRepo.setStatusAndPaymentId(Status.SUCCESS,LocalDateTime.now(),raz_paymentId,raz_orderId);
+            //Email kafka
+            //getDataFromCacheOfOrderPlace
+            OrderPlace cacheOrder = cacheService.getOrderPlace(orderId);
+            log.info("order get from cache:{}",cacheOrder);
+            OrderPaymentEmail emailSend=new OrderPaymentEmail(raz_orderId,raz_paymentId,cacheOrder);
+            try {
+                template.send(topic, raz_orderId,emailSend);
+                System.out.println("email send of orderPlace to "+emailSend.getOrder().getUserEmail());
+            }
+            catch (Exception e){
+                System.out.println("email not send for order place with email :"+emailSend.getOrder().getUserEmail());
+            }
+            cacheService.remove(orderId);
+        }
+        log.info("Payment Status updated with "+update+" and Status is "+raz_status);
+    }
 }

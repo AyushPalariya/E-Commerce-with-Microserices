@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.Enumeration;
@@ -24,6 +25,7 @@ public class OrderEntity {
     private Double totalAmount;
     @Enumerated(EnumType.STRING)
     private Status status;
+    @CreationTimestamp
     private LocalDateTime datetime;
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> items;

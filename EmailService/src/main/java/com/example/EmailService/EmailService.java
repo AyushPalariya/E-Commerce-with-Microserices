@@ -11,7 +11,8 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-
+import java.net.InetAddress;
+import jakarta.annotation.PostConstruct;
 @Slf4j
 @RequiredArgsConstructor
 @Service
@@ -56,18 +57,20 @@ public class EmailService {
     }
 
     @KafkaListener(topics="${kafka.topic.order}",groupId = "order-place-group")
-    public void sendOrderPlaced(OrderPlace orderPlace) throws MessagingException {
+    public void sendOrderPlaced(OrderPaymentEmail orderPlace) throws MessagingException {
         MimeMessage mimeMessage=javaMailSender.createMimeMessage();
         MimeMessageHelper helper=new MimeMessageHelper(mimeMessage,true);
-        helper.setTo(orderPlace.getUserEmail());
+        helper.setTo(orderPlace.getOrder().getUserEmail());
         helper.setSubject("Order placed Successfully");
         StringBuilder orderDetails = new StringBuilder();
 
-        orderDetails.append("Hello ").append(orderPlace.getName())
+        orderDetails.append("Hello ").append(orderPlace.getOrder().getName())
                 .append(",\n")
                 .append("Thank you for placing your order!\n")
+                .append("Your OrderId :").append(orderPlace.getOrderId()).append("\n")
+                .append("Your PaymentId :").append(orderPlace.getPaymentId()).append("\n")
                 .append("Your Order Details:\n\n");
-        List<ItemDto> list=orderPlace.getItems();
+        List<ItemDto> list=orderPlace.getOrder().getItems();
         for (int i = 0; i < list.size(); i++) {
             ItemDto item = list.get(i);
             orderDetails.append(i + 1).append(". ")
@@ -76,12 +79,27 @@ public class EmailService {
                     .append("   Amount: ₹").append(item.getSubAmount()).append("\n\n");
         }
         orderDetails.append("Total Amount: ")
-                .append(orderPlace.getTotalAmount())
+                .append(orderPlace.getOrder().getTotalAmount())
                 .append("\n\n")
                 .append("Thank you for shopping with us!");
         System.out.println(orderDetails);
         helper.setText(orderDetails.toString(),false);
         //also generate pdf and send to mail_id
         javaMailSender.send(mimeMessage);
+    }
+    @PostConstruct
+    public void checkMailConnection() {
+
+        try {
+            InetAddress[] addresses =
+                    InetAddress.getAllByName("smtp.gmail.com");
+
+            for (InetAddress address : addresses) {
+                log.info("SMTP IP: {}", address.getHostAddress());
+            }
+
+        } catch (Exception e) {
+            log.error("DNS resolution failed", e);
+        }
     }
 }

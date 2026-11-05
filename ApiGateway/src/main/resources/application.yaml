@@ -23,6 +23,10 @@ spring:
               uri: lb://ORDERSERVICE
               predicates:
                 - Path=/order/**
+            - id: PAYMENT-SERVICE
+              uri: lb://PAYMENTSERVICE
+              predicates:
+                - Path=/payment/**
 
 security:
   jwt:

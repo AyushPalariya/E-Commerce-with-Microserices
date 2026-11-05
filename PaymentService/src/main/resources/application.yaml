@@ -10,7 +10,22 @@ spring:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: update
-      show-sql: true
+    show-sql: true
+    properties:
+      hibernate:
+        format-sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: true
 eureka:
   client:
     serviceUrl:
@@ -21,5 +36,9 @@ server:
 
 razorpay:
   key:
-    id: rzp_test_TvMfiqPGDXo4tO
-    secret: yIEvSohbJqX5iSqJTHoTBsq5
+    id: rzp_test_Tw1N4IYHQuk1jL
+    secret: lxrrf8Vq7ASfDzz2t3tFZGSS
+
+kafka:
+  topic:
+    order: orderPlace

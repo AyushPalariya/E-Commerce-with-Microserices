@@ -13,8 +13,9 @@ spring:
         spring.json.type.mapping:
                                 com.example.AuthService.DTO.RegistrationEmailEvent:com.example.EmailService.RegistrationEmailEvent,
                                 com.example.AuthService.DTO.ForgotPassword:com.example.EmailService.ForgotPassword,
-                                com.example.OrderService.Dto.ItemDto:com.example.EmailService.ItemDto,
-                                com.example.OrderService.Dto.OrderPlace:com.example.EmailService.OrderPlace
+                                com.example.PaymentService.Dto.ItemDto:com.example.EmailService.ItemDto,
+                                com.example.PaymentService.Dto.OrderPlace:com.example.EmailService.OrderPlace,
+                                com.example.PaymentService.Dto.OrderPaymentEmail:com.example.EmailService.OrderPaymentEmail
 
 
 
@@ -22,7 +23,7 @@ spring:
     host: smtp.gmail.com
     port: 587
     username: ${MAIL_USERNAME:ayush.p@zecdata.com}
-    password: ${MAIL_PASSWORD:hfny fpwv haaf lpjq}
+    password: ${MAIL_PASSWORD:gnvh psqp vtqx sebd}
     properties:
       mail:
         smtp:
@@ -30,6 +31,9 @@ spring:
           starttls:
             enable: true
             required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
 
 eureka:
   client:

@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Table(name="auth_table")
 @NoArgsConstructor
 public class AuthUserEntity implements Serializable {
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Id
     private Long id;
     private String name;
