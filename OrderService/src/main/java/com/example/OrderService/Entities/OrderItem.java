@@ -17,7 +17,7 @@ public class OrderItem implements Serializable {
     private Long id;
     private Long product_id;
     private String product_name;
-    private int quantities;
+    private Long quantities;
     private Double subAmount;
     @ManyToOne
     @JoinColumn(name = "order_id",referencedColumnName = "id")

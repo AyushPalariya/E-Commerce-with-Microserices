@@ -28,7 +28,9 @@ public class SecurityConfig {
                     //after testing user/getAllProfile and order/getAllOrders define role ADMIN
                     "/user/getAllProfile",
                     "/order/getAllOrders",
-                    "/payment/webhooks"
+                    "/payment/webhooks",
+                    //after testing define admin role
+                    "/inventory/**"
             };
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity){

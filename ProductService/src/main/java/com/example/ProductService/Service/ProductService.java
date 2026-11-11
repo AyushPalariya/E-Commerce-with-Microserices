@@ -1,11 +1,14 @@
 package com.example.ProductService.Service;
 
 import com.example.ProductService.Dto.Product;
+import com.example.ProductService.Dto.VerifyProduct;
 import com.example.ProductService.Entities.Products;
 import com.example.ProductService.ExceptionHandle.BadRequestException;
 import com.example.ProductService.ExceptionHandle.ConflictException;
+import com.example.ProductService.ExceptionHandle.ProductIdsNotFound;
 import com.example.ProductService.ExceptionHandle.ResourceNotFound;
 import com.example.ProductService.Repository.ProductRepo;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
@@ -17,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductService {
@@ -90,11 +94,23 @@ public class ProductService {
         System.out.println("Product cache cleared!");
     }
 
-
+    @Transactional
     public List<Product> getAllProductsById(List<Long> ids) {
         List<Products> allById = productRepo.findAllById(ids);
         return allById.stream().map(product->new Product(product.getId(), product.getCategory(),
                 product.getDescription(), product.getImg(), product.getAmount(), product.getName()))
                 .toList();
+    }
+    @Transactional
+    public List<VerifyProduct> verify(List<VerifyProduct> products) {
+        List<Long> ids=products.stream().map(VerifyProduct::getId).toList();
+        List<VerifyProduct> verify=productRepo.findVerifyProducts(ids);
+        Map<Long,String> mp=verify.stream().collect(Collectors.toMap(VerifyProduct::getId,VerifyProduct::getName));
+        for(VerifyProduct p:products){
+            if(!mp.containsKey(p.getId())||!mp.containsValue(p.getName())){
+                throw new ProductIdsNotFound("Invalid product ID or name: "+p.getId()+"-"+p.getName());
+            }
+        }
+        return verify;
     }
 }

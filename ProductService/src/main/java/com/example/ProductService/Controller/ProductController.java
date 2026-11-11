@@ -1,6 +1,7 @@
 package com.example.ProductService.Controller;
 
 import com.example.ProductService.Dto.Product;
+import com.example.ProductService.Dto.VerifyProduct;
 import com.example.ProductService.Entities.Products;
 import com.example.ProductService.Service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,5 +47,9 @@ public class ProductController {
     @PostMapping("/bulk")
     public ResponseEntity<List<Product>> getProductwithIds(@RequestBody List<Long> ids){
         return ResponseEntity.ok().body(productService.getAllProductsById(ids));
+    }
+    @PostMapping("/verify")
+    public ResponseEntity<List<VerifyProduct>> verifyFromInventory(@RequestBody List<VerifyProduct> products){
+        return new ResponseEntity<>(productService.verify(products),HttpStatus.OK);
     }
 }

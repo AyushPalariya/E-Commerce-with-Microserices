@@ -16,6 +16,6 @@ public class ItemDto implements Serializable {
     private Long id;//include in response
     private Long product_id;
     private String product_name;//include in response
-    private int quantities;
+    private Long quantities;
     private Double subAmount;//include in response
 }

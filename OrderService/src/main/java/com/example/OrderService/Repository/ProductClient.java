@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import java.util.List;
 
 @FeignClient(name = "PRODUCTSERVICE")
-public interface FeignClientInterface {
+public interface ProductClient {
     @PostMapping("/products/bulk")
      ResponseEntity<List<ProductDto>> getProducts(@RequestBody List<Long> ids);
 }

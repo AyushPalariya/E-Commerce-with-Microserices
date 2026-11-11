@@ -26,4 +26,9 @@ public class GlobalExceptionClass {
         ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.CONFLICT,"Conflict",ex.getMessage(),req.getRequestURI());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
+    @ExceptionHandler(ProductIdsNotFound.class)
+    public ResponseEntity<ApiError> handleProduct(ProductIdsNotFound ex,HttpServletRequest req){
+        ApiError error=new ApiError(LocalDateTime.now(), HttpStatus.NOT_FOUND,"ids not found",ex.getMessage(),req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
 }

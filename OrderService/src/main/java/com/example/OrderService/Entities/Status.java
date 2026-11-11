@@ -2,6 +2,8 @@ package com.example.OrderService.Entities;
 
 public enum Status {
     PLACED,
+    INVENTORY_PENDING,
+    INVENTORY_FAILED,
     PAYMENT_PENDING,
     PAID,
     PACKED,

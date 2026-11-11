@@ -5,8 +5,11 @@ import com.example.OrderService.Entities.OrderEntity;
 import com.example.OrderService.Entities.OrderItem;
 import com.example.OrderService.Entities.Status;
 import com.example.OrderService.Exception.BadRequestException;
-import com.example.OrderService.Repository.FeignClientInterface;
+
+import com.example.OrderService.Repository.InventoryClient;
 import com.example.OrderService.Repository.OrderRepo;
+import com.example.OrderService.Repository.ProductClient;
+import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,13 +33,16 @@ public class OrderService {
     private OrderRepo orderRepo;
 
     @Autowired
-    private FeignClientInterface feignClientInterface;
+    private ProductClient productClient;
+    @Autowired
+    private InventoryClient inventoryClient;
+
     @CacheEvict(value = "userOrder",allEntries = true)
     @Transactional
     public OrderPlace orderPlace(OrderPlace orderPlace,String email,Long userid){
         validateOrder(orderPlace, email, userid);
         List<Long> product_ids=orderPlace.getItems().stream().map(ItemDto::getProduct_id).distinct().toList();
-        List<ProductDto> products= feignClientInterface.getProducts(product_ids).getBody();
+        List<ProductDto> products= productClient.getProducts(product_ids).getBody();
 
         if (products == null || products.isEmpty()) {
             throw new BadRequestException("Products not found");
@@ -56,7 +62,8 @@ public class OrderService {
         order.setUserId(userid);
         order.setUserEmail(email);
         order.setUserName(orderPlace.getName());
-        order.setStatus(Status.PAYMENT_PENDING);
+        order.setStatus(Status.INVENTORY_PENDING);
+        log.info("Order status is :{}",Status.INVENTORY_PENDING);
 
         List<OrderItem> items = new ArrayList<>();
         double totalAmount=0.0;
@@ -77,7 +84,8 @@ public class OrderService {
         order.setItems(items);
         order.setTotalAmount(totalAmount);
 
-        OrderEntity save = orderRepo.save(order);
+        OrderEntity save = orderRepo.saveAndFlush(order);
+        List<InventoryItem> inv=new ArrayList<>();
         List<ItemDto> itemDto=save.getItems().stream().map(item -> {
             ItemDto savedItem = new ItemDto();
             savedItem.setId(item.getId());
@@ -85,8 +93,31 @@ public class OrderService {
             savedItem.setProduct_name(item.getProduct_name());
             savedItem.setQuantities(item.getQuantities());
             savedItem.setSubAmount(item.getSubAmount());
+            InventoryItem inventoryItem=new InventoryItem(item.getProduct_id(),item.getQuantities());
+            inv.add(inventoryItem);
             return savedItem;
         }).toList();
+        try {
+            inventoryClient.reserved(save.getId(), inv);
+            log.info("Inventory reserved..");
+        }
+        catch (FeignException.BadRequest|FeignException.Conflict e){
+            log.info("Order status is :{}",Status.INVENTORY_FAILED);
+            orderRepo.updateStatus(save.getId(),Status.INVENTORY_FAILED);
+            throw new BadRequestException(
+                    "Inventory reservation failed: " + e.getMessage()
+            );
+        }
+        catch (Exception e) {
+            throw new RuntimeException(
+                    "Unable to confirm inventory reservation. " +
+                            "Order requires reconciliation."
+            );
+        }
+        orderRepo.updateStatus(save.getId(),Status.PAYMENT_PENDING);
+        log.info("Order status is :{}",Status.PAYMENT_PENDING);
+
+
         OrderPlace orderPlace1 = new OrderPlace(save.getId(), save.getUserId(), save.getUserEmail(), orderPlace.getName(),
                 save.getTotalAmount(), String.valueOf(save.getStatus()), save.getDatetime(), itemDto);
 
