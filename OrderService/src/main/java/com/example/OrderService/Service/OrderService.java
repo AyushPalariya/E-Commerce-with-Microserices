@@ -115,6 +115,7 @@ public class OrderService {
             );
         }
         orderRepo.updateStatus(save.getId(),Status.PAYMENT_PENDING);
+        save.setStatus(Status.PAYMENT_PENDING);
         log.info("Order status is :{}",Status.PAYMENT_PENDING);
 
 
@@ -179,5 +180,25 @@ public class OrderService {
         List<OrderPlace> orderPlaces = convertInDto(List.of(orderEntity));
         System.out.println("Payment want this order: "+orderPlaces);
         return orderPlaces.get(0);
+    }
+
+    @Transactional
+    @CacheEvict(value = "userOrder", allEntries = true)
+    public void paymentSucceeded(Long orderId) {
+        OrderEntity order = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found!"));
+        if (order.getStatus() == Status.PAID) return;
+        if (order.getStatus() != Status.PAYMENT_PENDING) throw new BadRequestException("Order is not awaiting payment!");
+        inventoryClient.confirm(orderId);
+        orderRepo.updateStatus(orderId, Status.PAID);
+    }
+
+    @Transactional
+    @CacheEvict(value = "userOrder", allEntries = true)
+    public void paymentFailed(Long orderId) {
+        OrderEntity order = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found!"));
+        if (order.getStatus() == Status.CANCELLED) return;
+        if (order.getStatus() != Status.PAYMENT_PENDING) throw new BadRequestException("Order is not awaiting payment!");
+        inventoryClient.release(orderId);
+        orderRepo.updateStatus(orderId, Status.CANCELLED);
     }
 }

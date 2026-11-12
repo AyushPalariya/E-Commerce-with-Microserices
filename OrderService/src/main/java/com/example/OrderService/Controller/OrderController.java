@@ -50,4 +50,16 @@ public class OrderController {
     public ResponseEntity<OrderPlace> getOrder(@PathVariable Long orderId,@RequestBody UserDetailsDto userDetails){
         return new ResponseEntity<>(orderService.getOrder(orderId,userDetails), HttpStatus.OK);
     }
+
+    @PostMapping("/internal/{orderId}/payment-success")
+    public ResponseEntity<Void> paymentSucceeded(@PathVariable Long orderId){
+        orderService.paymentSucceeded(orderId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/internal/{orderId}/payment-failed")
+    public ResponseEntity<Void> paymentFailed(@PathVariable Long orderId){
+        orderService.paymentFailed(orderId);
+        return ResponseEntity.noContent().build();
+    }
 }

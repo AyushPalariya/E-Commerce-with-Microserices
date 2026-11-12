@@ -7,6 +7,7 @@ import com.example.PaymentService.Entities.Status;
 import com.example.PaymentService.GlobalException.BadRequestExceptionClass;
 import com.example.PaymentService.GlobalException.RazorpayExceptionClass;
 import com.example.PaymentService.Repository.PaymentRepo;
+import com.example.PaymentService.Repository.OrderClientInterface;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
@@ -35,6 +36,8 @@ public class PaymentService {
     private RazorpayClient razorpayClient;
     @Autowired
     private PaymentRepo paymentRepo;
+    @Autowired
+    private OrderClientInterface orderClient;
     @Value("${razorpay.key.id}")
     private String keyId;
 
@@ -94,15 +97,22 @@ public class PaymentService {
         int update=999;
 
         if(raz_status.equals("failed")){
+            PaymentStatusOrder result = paymentRepo.findOrderIdAndStatus(raz_orderId).orElseThrow();
+            if (result.getStatus() == Status.SUCCESS) return;
             update = paymentRepo.setStatusAndPaymentId(Status.FAILED,LocalDateTime.now(), raz_paymentId,raz_orderId);
+            orderClient.paymentFailed(result.getOrderId());
         }
         else if(raz_status.equals("captured")){
             PaymentStatusOrder result = paymentRepo.findOrderIdAndStatus(raz_orderId).orElseThrow();
             Long orderId =result.getOrderId();
             System.out.println(orderId);
             System.out.println(result.getStatus());
-            if(result.getStatus()==Status.SUCCESS) return ;
+            if(result.getStatus()==Status.SUCCESS) {
+                orderClient.paymentSucceeded(orderId);
+                return;
+            }
             update=paymentRepo.setStatusAndPaymentId(Status.SUCCESS,LocalDateTime.now(),raz_paymentId,raz_orderId);
+            orderClient.paymentSucceeded(orderId);
             //Email kafka
             //getDataFromCacheOfOrderPlace
             OrderPlace cacheOrder = cacheService.getOrderPlace(orderId);

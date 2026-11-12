@@ -60,7 +60,7 @@ public class ProductService {
         Products p= productRepo.findById(id).orElseThrow(()->new ResourceNotFound("Product not found with id: "+id));
         return new Product(p.getId(),p.getCategory(),p.getDescription(),p.getImg(),p.getAmount(), p.getName());
     }
-    @CacheEvict(value = "product",key = "#id")
+    @CacheEvict(value = "product",allEntries = true)
     public Product updateProduct(Long id, Map<String,Object> mp){
         Products p= productRepo.findById(id).orElseThrow(()->new ResourceNotFound("Product not found with id: "+id));
         for(String key:mp.keySet()){
@@ -74,7 +74,7 @@ public class ProductService {
         return new Product(p.getId(),p.getCategory(),p.getDescription(),p.getImg(),p.getAmount(), p.getName());
     }
 
-    @CacheEvict(value = "product",key = "#id")
+    @CacheEvict(value = "product",allEntries = true)
     public Map<String,String> deleteProduct(Long id){
         if (id == null || id <= 0) throw new BadRequestException("Product id must be positive!");
         if(!productRepo.existsById(id)) throw new ResourceNotFound("Product not found with id: "+id);
@@ -103,11 +103,15 @@ public class ProductService {
     }
     @Transactional
     public List<VerifyProduct> verify(List<VerifyProduct> products) {
+        if (products == null || products.isEmpty()) throw new BadRequestException("At least one product is required!");
+        if (products.stream().anyMatch(product -> product == null || product.getId() == null || product.getId() <= 0
+                || product.getName() == null || product.getName().isBlank()))
+            throw new BadRequestException("Each product must have a valid id and name!");
         List<Long> ids=products.stream().map(VerifyProduct::getId).toList();
         List<VerifyProduct> verify=productRepo.findVerifyProducts(ids);
         Map<Long,String> mp=verify.stream().collect(Collectors.toMap(VerifyProduct::getId,VerifyProduct::getName));
         for(VerifyProduct p:products){
-            if(!mp.containsKey(p.getId())||!mp.containsValue(p.getName())){
+            if(!p.getName().equals(mp.get(p.getId()))){
                 throw new ProductIdsNotFound("Invalid product ID or name: "+p.getId()+"-"+p.getName());
             }
         }

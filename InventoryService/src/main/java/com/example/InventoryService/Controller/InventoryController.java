@@ -2,6 +2,7 @@ package com.example.InventoryService.Controller;
 
 import com.example.InventoryService.Dto.Inventory;
 import com.example.InventoryService.Dto.InventoryItem;
+import com.example.InventoryService.Entities.ReservationEntity;
 import com.example.InventoryService.Service.InventoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -25,17 +26,44 @@ public class InventoryController {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
     @PostMapping("/reserved/{orderId}")
-    public ResponseEntity<Void> reserved(@PathVariable Long orderId, @RequestBody List<InventoryItem> items){
+    public ResponseEntity<Void> reservedFromOrder(@PathVariable Long orderId, @RequestBody List<InventoryItem> items){
         inventoryService.reserved(orderId,items);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+    @PostMapping("/released/{orderId}")
+    public ResponseEntity<Void> releaseReservation(@PathVariable Long orderId){
+        inventoryService.release(orderId);
+        return ResponseEntity.noContent().build();
+    }
+    @PostMapping("/confirm/{orderId}")
+    public ResponseEntity<Void> confirmReservation(@PathVariable Long orderId){
+        inventoryService.confirm(orderId);
+        return ResponseEntity.noContent().build();
     }
     @GetMapping("/stocks")
     public ResponseEntity<List<Inventory>> getAllStock(){
         return ResponseEntity.ok(inventoryService.getAllStock());
     }
-    @PutMapping("/update")
-    public ResponseEntity<List<Inventory>> update(List<InventoryItem> inventoryItems){
+    @PatchMapping("/update")
+    public ResponseEntity<List<Inventory>> update(@RequestBody List<InventoryItem> inventoryItems){
         return new ResponseEntity<>(inventoryService.updateInventory(inventoryItems),HttpStatus.OK);
     }
+    @PostMapping("/stock")                              //productId only from request
+    public ResponseEntity<Inventory> getStock(@RequestBody Inventory inventory){
+        return new ResponseEntity<>(inventoryService.getStock(inventory),HttpStatus.OK);
+    }
+    @GetMapping("/reserved")
+    public ResponseEntity<List<ReservationEntity>> getReservedRecords(){
+        return new ResponseEntity<>(inventoryService.getReservedRecords(),HttpStatus.OK);
+    }
+    @GetMapping("/released")
+    public ResponseEntity<List<ReservationEntity>> getReleasedRecords(){
+        return new ResponseEntity<>(inventoryService.getReleasedRecords(),HttpStatus.OK);
+    }
+    @GetMapping("/confirmed")
+    public ResponseEntity<List<ReservationEntity>> getConfirmedRecords(){
+        return new ResponseEntity<>(inventoryService.getConfirmedRecords(),HttpStatus.OK);
+    }
+
 
 }

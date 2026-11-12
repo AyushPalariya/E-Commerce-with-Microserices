@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 
-@FeignClient(name="PRODUCTSERVICE")
-public interface FeignClientInterface {
+@FeignClient(name = "PRODUCTSERVICE", contextId = "inventoryProductClient")
+public interface ProductClientInterface {
 
     @PostMapping("/products/verify")
     List<Product> verifyProductIds(@RequestBody List<Product> productList);
