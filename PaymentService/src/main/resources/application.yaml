@@ -2,9 +2,9 @@ spring:
   application:
     name: PaymentService
   datasource:
-    url: jdbc:mysql://localhost:3306/ZecPaymentDB
-    username: root
-    password: root
+    url: ${PAYMENT_DB_URL:jdbc:mysql://localhost:3306/ZecPaymentDB}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
@@ -16,11 +16,11 @@ spring:
         format-sql: true
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVER:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -29,15 +29,15 @@ spring:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://localhost:8081/eureka/
+      defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
 
 server:
-  port: 8086
+  port: ${PAYMENT_SERVICE_PORT:8086}
 
 razorpay:
   key:
-    id: rzp_test_Tw1N4IYHQuk1jL
-    secret: lxrrf8Vq7ASfDzz2t3tFZGSS
+    id: ${RAZORPAY_KEY_ID:rzp_test_Tw1N4IYHQuk1jL}
+    secret: ${RAZORPAY_KEY_SECRET:lxrrf8Vq7ASfDzz2t3tFZGSS}
 
 kafka:
   topic:

@@ -56,6 +56,8 @@ public class AuthService {
     private String topicName;
     @Value("${kafka.topic.reset}")
     private String resetTopic;
+    @Value("${kafka.topic.getOtp}")
+    private String getOtp;
 
     @Transactional
     public UserRegistration register(UserRegistration userRegistration) {
@@ -199,6 +201,25 @@ public class AuthService {
         cookieService.clearHeader(res);
         return "User deleted form authService with email_id:" + email;
     }
+    public Map<String, String> sendOtp(Map<String, String> mp){
+        //"email":".."
+        if (mp == null) throw new BadRequestExceptionClass("mp not be null!");
+        String email = mp.get("email");
+        if (email == null || email.isBlank()) throw new BadRequestExceptionClass("Email is required!");
+        OtpVerify v=new OtpVerify();
+        v.setEmail(email);
+        String otp= cacheService.generateOtp(email);
+        v.setOtp(otp);
+        try {
+            template.send(getOtp,email,v);
+            log.info("Send otp for verification of email:{}",email);
+        }
+        catch (Exception e){
+            log.info("otp not send to email for verification.");
+        }
+        return Map.of("email",email,"dateTime",String.valueOf(LocalDateTime.now().plusMinutes(5)));
+    }
+
     @Transactional
     public Map<String, String> forgot(Map<String, String> mp) {
         //"email":"..."
@@ -211,8 +232,12 @@ public class AuthService {
         forget.setName(authUserEntity.getName());
         String otp=cacheService.generateOtp(email);
         forget.setOtp(otp);
-
-        template.send(resetTopic, email, forget);
+        try {
+            template.send(resetTopic, email, forget);
+        }
+        catch (Exception e){
+            log.info("otp not send to email for forgot the password");
+        }
 
         return Map.of("email", email,"datetime",String.valueOf(LocalDateTime.now().plusMinutes(5)));
     }

@@ -34,16 +34,16 @@ spring:
 
 security:
   jwt:
-    key: djaijdfnneijrie834382njnefnsdfekwapiwej02393wjnrefejwfnfslaeialewer323nnfioeje33
-    rftAccessible: 12000
+    key: ${JWT_KEY:djaijdfnneijrie834382njnefnsdfekwapiwej02393wjnrefejwfnfslaeialewer323nnfioeje33}
+    rftAccessible: ${JWT_RFT_ACCESSIBLE:12000}
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://localhost:8081/eureka/
+      defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
 
 server:
-  port: 8080
+  port: ${API_GATEWAY_PORT:8080}
 
 
   

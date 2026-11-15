@@ -8,6 +8,7 @@ import com.example.PaymentService.GlobalException.BadRequestExceptionClass;
 import com.example.PaymentService.GlobalException.RazorpayExceptionClass;
 import com.example.PaymentService.Repository.PaymentRepo;
 import com.example.PaymentService.Repository.OrderClientInterface;
+import com.example.PaymentService.Repository.InventoryClient;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
@@ -38,6 +39,8 @@ public class PaymentService {
     private PaymentRepo paymentRepo;
     @Autowired
     private OrderClientInterface orderClient;
+    @Autowired
+    private InventoryClient inventoryClient;
     @Value("${razorpay.key.id}")
     private String keyId;
 
@@ -50,14 +53,18 @@ public class PaymentService {
             PaymentEntity pp=byOrderId.get();
             log.info("payment retry for orderId {}",pp.getOrderId());
             if(pp.getStatus()==Status.SUCCESS) throw new RazorpayExceptionClass("Payment already done for this order!");
+            if(pp.getStatus()==Status.FAILED) throw new RazorpayExceptionClass("Payment has failed for this order!");
+            inventoryClient.markPaymentStarted(orderId);
             return new PaymentResponseDto(pp.getRaz_order_id(), pp.getAmount()*100, keyId);
         }
 
         UserDetailsDto userDetails=new UserDetailsDto(email,userId);
         //cache to get orderPlace
         OrderPlace paymentOrder = cacheService.putOrderPlace(orderId, userDetails);
-
-        JSONObject order=new JSONObject();
+        if (paymentOrder == null) throw new BadRequestExceptionClass("Order was not found or is not payable!");
+        inventoryClient.markPaymentStarted(orderId);
+        try {
+            JSONObject order=new JSONObject();
             order.put("amount",paymentOrder.getTotalAmount()*100);
             order.put("currency","INR");
             order.put("receipt","txn_"+ UUID.randomUUID());
@@ -70,6 +77,15 @@ public class PaymentService {
             PaymentEntity save = paymentRepo.save(p);
             log.info("new payment for orderId:{}",save.getOrderId());
             return new PaymentResponseDto(raz_order_id, save.getAmount()*100, keyId);
+        } catch (RazorpayException | RuntimeException exception) {
+            try {
+                inventoryClient.clearPaymentStarted(orderId);
+            } catch (Exception clearException) {
+                exception.addSuppressed(clearException);
+                log.error("Unable to clear payment-started marker for orderId {}", orderId, clearException);
+            }
+            throw exception;
+        }
     }
 
     private void validate(Long orderId, Long userId, String email) {

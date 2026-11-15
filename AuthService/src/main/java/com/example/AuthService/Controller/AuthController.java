@@ -20,7 +20,6 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<UserRegistration> registration(@RequestBody UserRegistration userRegistration){
-
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(userRegistration));
     }
     @PostMapping("/login")
@@ -40,13 +39,17 @@ public class AuthController {
     public ResponseEntity<String> delete(@PathVariable("email") String email, HttpServletResponse res){
         return ResponseEntity.status(HttpStatus.OK).body(authService.delete(email,res));
     }
-
+    //for verification of email
+    @PostMapping("/send-otp")
+    public ResponseEntity<Map<String,String>> sendOtp(@RequestBody Map<String,String> mp){
+        return ResponseEntity.status(HttpStatus.OK).body(authService.sendOtp(mp));
+    }
     @PostMapping("/forgotPassword")
     public ResponseEntity<Map<String,String>> forgotPassword(@RequestBody Map<String,String> mp){
         return ResponseEntity.status(HttpStatus.OK).body(authService.forgot(mp));
     }
     @PostMapping("/valid-otp")
-    public ResponseEntity<Map<String,String>> passwordReset(@RequestBody OtpToken otpToken){
+    public ResponseEntity<Map<String,String>> passwordResetOrVerifyOtp(@RequestBody OtpToken otpToken){
         return ResponseEntity.status(HttpStatus.OK).body(authService.validateOtp(otpToken));
     }
     @PatchMapping("/password-reset")

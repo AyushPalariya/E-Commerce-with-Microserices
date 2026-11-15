@@ -24,10 +24,11 @@ public class Inventory implements Serializable {
     private Long soldQuantity;
 
     //adding response
-    public Inventory(Long id, String name, Long productId, Long totalQuantity) {
+    public Inventory(Long id, String name, Long productId, Long totalQuantity,Long ava) {
         this.id = id;
         this.name = name;
         this.productId = productId;
         this.totalQuantity = totalQuantity;
+        this.availableQuantity=ava;
     }
 }

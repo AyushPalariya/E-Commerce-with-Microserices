@@ -17,6 +17,9 @@ public interface InventoryClient {
     @PostMapping("/inventory/released/{orderId}")
     void release(@PathVariable("orderId") Long orderId);
 
+    @PostMapping("/inventory/payment-aborted/{orderId}")
+    void clearPaymentStarted(@PathVariable("orderId") Long orderId);
+
     @PostMapping("/inventory/confirm/{orderId}")
     void confirm(@PathVariable("orderId") Long orderId);
 }

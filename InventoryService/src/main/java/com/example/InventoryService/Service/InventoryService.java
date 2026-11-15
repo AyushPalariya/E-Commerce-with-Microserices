@@ -16,8 +16,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +54,7 @@ public class InventoryService {
     }
 
     private List<Inventory> convertIntoDto(List<InventoryEntity> inventoryEntities) {
-        return inventoryEntities.stream().map(en->new Inventory(en.getId(),en.getName(),en.getProductId(),en.getTotalQuantity()))
+        return inventoryEntities.stream().map(en->new Inventory(en.getId(),en.getName(),en.getProductId(),en.getTotalQuantity(),en.getAvailableQuantity()))
                 .toList();
     }
 
@@ -87,6 +89,7 @@ public class InventoryService {
         if(inventories.size()!= productIds.size()) throw new BadRequestExceptionClass("some records are not found!");
         Map<Long,Long> mp=items.stream().collect(Collectors.toMap(InventoryItem::getProductId,InventoryItem::getQuantities));
         List<ReservationEntity> list=new ArrayList<>();
+        LocalDateTime expiredAt = LocalDateTime.now().plusMinutes(15);
         for(InventoryEntity in:inventories){
             Long dbAvailableQuantity = currentAvailableQuantity(in);
             Long userQuantity=mp.get(in.getProductId());
@@ -95,7 +98,7 @@ public class InventoryService {
             Long reservedQuantity = in.getReservedQuantity();
             if(reservedQuantity==null) in.setReservedQuantity(userQuantity);
             else in.setReservedQuantity(reservedQuantity+userQuantity);
-            list.add(new ReservationEntity(orderId,in.getProductId(),userQuantity, Status.RESERVED));
+            list.add(new ReservationEntity(orderId,in.getProductId(),userQuantity, Status.RESERVED, expiredAt));
         }
         List<ReservationEntity> reservationEntities = reservationRepo.saveAll(list);
         inventories = inventoryRepo.saveAll(inventories);
@@ -169,17 +172,7 @@ public class InventoryService {
     public void release(Long orderId) {
         List<ReservationEntity> reservations = activeReservations(orderId, Status.RELEASED);
         if (reservations.isEmpty()) return;
-        Map<Long, InventoryEntity> inventories = loadReservedInventories(orderId, reservations);
-        for (ReservationEntity reservation : reservations) {
-            InventoryEntity inventory = inventories.get(reservation.getProductId());
-            long reserved = inventory.getReservedQuantity() == null ? 0 : inventory.getReservedQuantity();
-            if (reserved < reservation.getQuantities()) throw new BadRequestExceptionClass("Reserved quantity is inconsistent for productId: " + reservation.getProductId());
-            inventory.setReservedQuantity(reserved - reservation.getQuantities());
-            inventory.setAvailableQuantity(currentAvailableQuantity(inventory) + reservation.getQuantities());
-            reservation.setStatus(Status.RELEASED);
-        }
-        inventoryRepo.saveAll(inventories.values());
-        reservationRepo.saveAll(reservations);
+        releaseActiveReservations(orderId, reservations);
     }
 
     @Transactional
@@ -198,6 +191,40 @@ public class InventoryService {
         }
         inventoryRepo.saveAll(inventories.values());
         reservationRepo.saveAll(reservations);
+    }
+
+    @Transactional
+    @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
+    public void markPaymentStarted(Long orderId) {
+        List<ReservationEntity> reservations = activeReservations(orderId, Status.CONFIRM);
+        if (reservations.isEmpty()) throw new BadRequestExceptionClass("No active reservation found for orderId: " + orderId);
+        LocalDateTime now = LocalDateTime.now();
+        if (reservations.stream().anyMatch(reservation -> reservation.getExpiredAt() == null || !reservation.getExpiredAt().isAfter(now)))
+            throw new BadRequestExceptionClass("Reservation has expired for orderId: " + orderId);
+        reservations.forEach(reservation -> reservation.setPaymentStarted(true));
+        reservationRepo.saveAll(reservations);
+        log.info("Payment Started..");
+    }
+
+    @Transactional
+    @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
+    public void clearPaymentStarted(Long orderId) {
+        if (orderId == null || orderId <= 0) throw new BadRequestExceptionClass("orderId must be valid!");
+        List<ReservationEntity> reservations = reservationRepo.findByOrderIdAndStatus(orderId, Status.RESERVED);
+        reservations.forEach(reservation -> reservation.setPaymentStarted(false));
+        reservationRepo.saveAll(reservations);
+    }
+
+    @Transactional
+    @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
+    @Scheduled(fixedDelayString = "${inventory.reservation-expiration-check-ms:30000}")
+    public void releaseExpiredReservations() {
+        List<ReservationEntity> expiredReservations = reservationRepo.findExpiredUnpaid(Status.RESERVED, LocalDateTime.now());
+        if (expiredReservations.isEmpty()) return;
+        Map<Long, List<ReservationEntity>> byOrder = expiredReservations.stream()
+                .collect(Collectors.groupingBy(ReservationEntity::getOrderId));
+        byOrder.forEach(this::releaseActiveReservations);
+        log.info("Released expired reservations for {} orders", byOrder.size());
     }
 
     private List<ReservationEntity> activeReservations(Long orderId, Status completedStatus) {
@@ -222,5 +249,19 @@ public class InventoryService {
         long reserved = inventory.getReservedQuantity() == null ? 0 : inventory.getReservedQuantity();
         long sold = inventory.getSoldQuantity() == null ? 0 : inventory.getSoldQuantity();
         return Math.max(0, inventory.getTotalQuantity() - reserved - sold);
+    }
+
+    private void releaseActiveReservations(Long orderId, List<ReservationEntity> reservations) {
+        Map<Long, InventoryEntity> inventories = loadReservedInventories(orderId, reservations);
+        for (ReservationEntity reservation : reservations) {
+            InventoryEntity inventory = inventories.get(reservation.getProductId());
+            long reserved = inventory.getReservedQuantity() == null ? 0 : inventory.getReservedQuantity();
+            if (reserved < reservation.getQuantities()) throw new BadRequestExceptionClass("Reserved quantity is inconsistent for productId: " + reservation.getProductId());
+            inventory.setReservedQuantity(reserved - reservation.getQuantities());
+            inventory.setAvailableQuantity(currentAvailableQuantity(inventory) + reservation.getQuantities());
+            reservation.setStatus(Status.RELEASED);
+        }
+        inventoryRepo.saveAll(inventories.values());
+        reservationRepo.saveAll(reservations);
     }
 }

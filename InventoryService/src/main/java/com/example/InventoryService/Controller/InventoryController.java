@@ -40,6 +40,16 @@ public class InventoryController {
         inventoryService.confirm(orderId);
         return ResponseEntity.noContent().build();
     }
+    @PostMapping("/payment-started/{orderId}")
+    public ResponseEntity<Void> paymentStarted(@PathVariable Long orderId){
+        inventoryService.markPaymentStarted(orderId);
+        return ResponseEntity.noContent().build();
+    }
+    @PostMapping("/payment-aborted/{orderId}")
+    public ResponseEntity<Void> paymentAborted(@PathVariable Long orderId){
+        inventoryService.clearPaymentStarted(orderId);
+        return ResponseEntity.noContent().build();
+    }
     @GetMapping("/stocks")
     public ResponseEntity<List<Inventory>> getAllStock(){
         return ResponseEntity.ok(inventoryService.getAllStock());

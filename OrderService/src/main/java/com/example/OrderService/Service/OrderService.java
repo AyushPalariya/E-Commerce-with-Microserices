@@ -198,7 +198,7 @@ public class OrderService {
         OrderEntity order = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found!"));
         if (order.getStatus() == Status.CANCELLED) return;
         if (order.getStatus() != Status.PAYMENT_PENDING) throw new BadRequestException("Order is not awaiting payment!");
-        inventoryClient.release(orderId);
+        inventoryClient.clearPaymentStarted(orderId);
         orderRepo.updateStatus(orderId, Status.CANCELLED);
     }
 }

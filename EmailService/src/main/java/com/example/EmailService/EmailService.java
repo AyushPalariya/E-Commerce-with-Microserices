@@ -82,7 +82,7 @@ public class EmailService {
                 .append(orderPlace.getOrder().getTotalAmount())
                 .append("\n\n")
                 .append("Thank you for shopping with us!");
-        System.out.println(orderDetails);
+        log.info("OrderDetails:{}",orderDetails);
         helper.setText(orderDetails.toString(),false);
         //also generate pdf and send to mail_id
         javaMailSender.send(mimeMessage);
@@ -101,5 +101,15 @@ public class EmailService {
         } catch (Exception e) {
             log.error("DNS resolution failed", e);
         }
+    }
+    @KafkaListener(topics = "${kafka.topic.getOtp}", groupId = "email-verify-group")
+    public void sendOtp(OtpVerify otpverify) throws MessagingException {
+        MimeMessage message=javaMailSender.createMimeMessage();
+        MimeMessageHelper helper=new MimeMessageHelper(message,true);
+        helper.setTo(otpverify.getEmail());
+        helper.setSubject("Otp for Verify the mail");
+        helper.setText("OTP : "+otpverify.getOtp());
+        javaMailSender.send(message);
+        log.info("Send Otp for verification the mail");
     }
 }
