@@ -1,6 +1,7 @@
 spring:
   application:
     name: PaymentService
+
   datasource:
     url: ${PAYMENT_DB_URL:jdbc:mysql://localhost:3306/ZecPaymentDB}
     username: ${DB_USERNAME:root}
@@ -30,7 +31,8 @@ eureka:
   client:
     serviceUrl:
       defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
-
+  instance:
+    prefer-ip-address: true
 server:
   port: ${PAYMENT_SERVICE_PORT:8086}
 
@@ -42,3 +44,9 @@ razorpay:
 kafka:
   topic:
     order: orderPlace
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

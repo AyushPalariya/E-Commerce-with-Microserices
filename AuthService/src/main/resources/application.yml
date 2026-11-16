@@ -1,6 +1,7 @@
 spring:
   application:
     name: AuthService
+
   datasource:
     url: ${AUTH_DB_URL:jdbc:mysql://localhost:3306/ZecAuthDB}
     username: ${DB_USERNAME:root}
@@ -51,4 +52,8 @@ security:
       domain: ${COOKIE_DOMAIN:localhost}
       sameSite: ${COOKIE_SITE:lax}
 
-
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

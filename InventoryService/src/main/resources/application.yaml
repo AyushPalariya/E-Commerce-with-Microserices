@@ -1,6 +1,7 @@
 spring:
   application:
     name: InventoryService
+
   datasource:
     url: ${INVENTORY_DB_UR:jdbc:mysql://localhost:3306/ZecInventoryDB}
     username: ${DB_USERNAME:root}
@@ -27,4 +28,11 @@ eureka:
   client:
     serviceUrl:
       defaultZone:  ${EUREKA_URL:http://localhost:8081/eureka/}
+  instance:
+    prefer-ip-address: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

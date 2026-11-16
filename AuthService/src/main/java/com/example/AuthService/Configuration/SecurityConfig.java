@@ -28,7 +28,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity){
         httpSecurity.csrf((csrf)->csrf.disable())
                 .sessionManagement((sm)->sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(req-> req.requestMatchers("/auth/**").permitAll()
+                .authorizeHttpRequests(req-> req.requestMatchers("/auth/**","/actuator/**").permitAll()
                         .anyRequest().authenticated());
         return httpSecurity.build();
     }

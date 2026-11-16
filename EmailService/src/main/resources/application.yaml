@@ -41,7 +41,8 @@ eureka:
   client:
     serviceUrl:
       defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
-
+  instance:
+    prefer-ip-address: true
 kafka:
   topic:
     name: profile
@@ -52,3 +53,9 @@ kafka:
 
 server:
   port: ${EMAIL_SERVICE_PORT:8090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

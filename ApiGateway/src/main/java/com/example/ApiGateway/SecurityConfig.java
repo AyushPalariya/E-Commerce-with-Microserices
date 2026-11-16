@@ -25,6 +25,7 @@ public class SecurityConfig {
             {       //after testing products define role ADMIN
                     "/products/**",
                     "/auth/**",
+                    "/actuator/**",
                     //after testing user/getAllProfile and order/getAllOrders define role ADMIN
                     "/user/getAllProfile",
                     "/order/getAllOrders",
