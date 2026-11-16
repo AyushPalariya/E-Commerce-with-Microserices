@@ -217,7 +217,7 @@ public class AuthService {
         catch (Exception e){
             log.info("otp not send to email for verification.");
         }
-        return Map.of("email",email,"dateTime",String.valueOf(LocalDateTime.now().plusMinutes(5)));
+        return Map.of("email",email,"datetime",String.valueOf(LocalDateTime.now().plusMinutes(5)));
     }
 
     @Transactional

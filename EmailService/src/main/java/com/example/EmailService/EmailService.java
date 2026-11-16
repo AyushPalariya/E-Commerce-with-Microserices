@@ -108,7 +108,7 @@ public class EmailService {
         MimeMessageHelper helper=new MimeMessageHelper(message,true);
         helper.setTo(otpverify.getEmail());
         helper.setSubject("Otp for Verify the mail");
-        helper.setText("OTP : "+otpverify.getOtp());
+        helper.setText("OTP : "+otpverify.getOtp()+"\n"+"otp expire in 5 min");
         javaMailSender.send(message);
         log.info("Send Otp for verification the mail");
     }
