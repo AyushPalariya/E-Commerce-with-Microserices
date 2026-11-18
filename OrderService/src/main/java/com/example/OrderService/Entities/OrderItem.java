@@ -19,6 +19,9 @@ public class OrderItem implements Serializable {
     private String product_name;
     private Long quantities;
     private Double subAmount;
+    private Double perAmount;
+    private String color;
+    private String size;
     @ManyToOne
     @JoinColumn(name = "order_id",referencedColumnName = "id")
     private OrderEntity order;

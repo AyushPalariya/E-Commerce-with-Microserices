@@ -1,0 +1,49 @@
+spring:
+  datasource:
+    url: ${PAYMENT_DB_URL:jdbc:mysql://localhost:3306/ZecPaymentDB}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format-sql: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVER:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: true
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
+  instance:
+    prefer-ip-address: true
+server:
+  port: ${PAYMENT_SERVICE_PORT:8086}
+
+razorpay:
+  key:
+    id: ${RAZORPAY_KEY_ID:rzp_test_Tw1N4IYHQuk1jL}
+    secret: ${RAZORPAY_KEY_SECRET:lxrrf8Vq7ASfDzz2t3tFZGSS}
+
+kafka:
+  topic:
+    order: orderPlace
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

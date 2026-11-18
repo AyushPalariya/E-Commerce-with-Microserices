@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,25 +68,33 @@ public class OrderService {
         log.info("Order status is :{}",Status.INVENTORY_PENDING);
 
         List<OrderItem> items = new ArrayList<>();
-        double totalAmount=0.0;
+        BigDecimal totalAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         for (ItemDto itemDto : orderPlace.getItems()) {
             ProductDto product=productMap.get(itemDto.getProduct_id());
             if (product == null) throw new BadRequestException("Product not found: " + itemDto.getProduct_id());
-            double subtotal=product.getAmount()*itemDto.getQuantities();
-            totalAmount+=subtotal;
+            validateVariant(itemDto.getColor(), product.getColor(), "color", product);
+            validateVariant(itemDto.getSize(), product.getSize(), "size", product);
+            BigDecimal unitPrice = discountedUnitPrice(product);
+            BigDecimal subtotal = unitPrice
+                    .multiply(BigDecimal.valueOf(itemDto.getQuantities()))
+                    .setScale(2, RoundingMode.HALF_UP);
+            totalAmount = totalAmount.add(subtotal);
             OrderItem item = new OrderItem();
             item.setProduct_id(product.getId());
             item.setProduct_name(product.getName());
             item.setQuantities(itemDto.getQuantities());
-            item.setSubAmount(subtotal);
+            item.setSubAmount(subtotal.doubleValue());
+            item.setPerAmount(unitPrice.doubleValue());
+            item.setColor(itemDto.getColor());
+            item.setSize(itemDto.getSize());
             item.setOrder(order);
             log.info(item.getOrder().toString());
             items.add(item);
         }
         order.setItems(items);
-        order.setTotalAmount(totalAmount);
+        order.setTotalAmount(totalAmount.doubleValue());
 
-        OrderEntity save = orderRepo.saveAndFlush(order);
+        OrderEntity save = orderRepo.save(order);
         List<InventoryItem> inv=new ArrayList<>();
         List<ItemDto> itemDto=save.getItems().stream().map(item -> {
             ItemDto savedItem = new ItemDto();
@@ -93,6 +103,9 @@ public class OrderService {
             savedItem.setProduct_name(item.getProduct_name());
             savedItem.setQuantities(item.getQuantities());
             savedItem.setSubAmount(item.getSubAmount());
+            savedItem.setPerAmount(item.getPerAmount());
+            savedItem.setColor(item.getColor());
+            savedItem.setSize(item.getSize());
             InventoryItem inventoryItem=new InventoryItem(item.getProduct_id(),item.getQuantities());
             inv.add(inventoryItem);
             return savedItem;
@@ -152,7 +165,45 @@ public class OrderService {
                 throw new BadRequestException("Each order item must have a positive product id!");
             if (item.getQuantities() <= 0)
                 throw new BadRequestException("Each order item quantity must be positive!");
+            if (item.getColor() == null || item.getColor().isBlank())
+                throw new BadRequestException("Each order item must include a color!");
+            if (item.getSize() == null || item.getSize().isBlank())
+                throw new BadRequestException("Each order item must include a size!");
         }
+    }
+
+    private void validateVariant(String selected, List<String> available, String field, ProductDto product) {
+        if (available == null || !available.contains(selected)) {
+            throw new BadRequestException("Selected " + field + " is unavailable for product: " + product.getId());
+        }
+    }
+
+    private BigDecimal discountedUnitPrice(ProductDto product) {
+        Double amount = product.getAmount();
+        if (amount == null || !Double.isFinite(amount) || amount < 0) {
+            throw new BadRequestException("Product has an invalid price: " + product.getId());
+        }
+
+        BigDecimal listedPrice = BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP);
+        Double discountAmount = product.getDiscountAmount();
+        if (discountAmount != null) {
+            if (!Double.isFinite(discountAmount) || discountAmount < 0
+                    || BigDecimal.valueOf(discountAmount).compareTo(listedPrice) > 0) {
+                throw new BadRequestException("Product has an invalid discount amount: " + product.getId());
+            }
+            return listedPrice.subtract(BigDecimal.valueOf(discountAmount)
+                    .setScale(2, RoundingMode.HALF_UP));
+        }
+
+        Long discountPercentage = product.getDiscountPercentage();
+        if (discountPercentage == null) return listedPrice;
+        if (discountPercentage < 0 || discountPercentage > 100) {
+            throw new BadRequestException("Product has an invalid discount percentage: " + product.getId());
+        }
+        BigDecimal discount = listedPrice
+                .multiply(BigDecimal.valueOf(discountPercentage))
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        return listedPrice.subtract(discount);
     }
 
     public List<OrderPlace> convertInDto(List<OrderEntity> all){
@@ -161,7 +212,8 @@ public class OrderService {
             List<OrderItem> items=entity.getItems();
             OrderPlace p=new OrderPlace(entity.getId(), entity.getUserId(), entity.getUserEmail(),
                     entity.getUserName(), entity.getTotalAmount(),String.valueOf(entity.getStatus()),entity.getDatetime(),
-                    items.stream().map(i->new ItemDto(i.getId(),i.getProduct_id(),i.getProduct_name(),i.getQuantities(),i.getSubAmount())).toList()  );
+                    items.stream().map(i->new ItemDto(i.getId(),i.getProduct_id(),i.getProduct_name(),
+                            i.getQuantities(),i.getSubAmount(),i.getPerAmount(),i.getColor(),i.getSize())).toList());
             place.add(p);
         }
         return place;
@@ -172,6 +224,7 @@ public class OrderService {
         System.out.println("order delete with orderId:"+orderId);
     }
 
+    @Transactional(readOnly = true)
     public OrderPlace getOrder(Long orderId, UserDetailsDto user) {
         OrderEntity orderEntity = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found! "));
         if(!orderEntity.getUserId().equals(user.getUserId())) throw new BadRequestException("userId "+user.getUserId()+" is not matches with orderEntity userId !");

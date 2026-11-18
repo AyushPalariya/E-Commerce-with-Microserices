@@ -1,0 +1,14 @@
+spring:
+  boot:
+    admin:
+      discovery:
+        enabled: true
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
+  instance:
+    prefer-ip-address: true
+
+server:
+  port: ${ADMIN_SERVER_PORT:8079}

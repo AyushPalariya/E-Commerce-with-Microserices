@@ -20,6 +20,10 @@ public class InventoryController {
     public ResponseEntity<List<Inventory>> add(@RequestBody List<Inventory> inventory){
         return ResponseEntity.status(HttpStatus.CREATED).body(inventoryService.add(inventory));
     }
+    @GetMapping("/maxSold")
+    public ResponseEntity<List<Long>> maxSold(){
+        return ResponseEntity.status(HttpStatus.OK).body(inventoryService.maxSold());
+    }
     @DeleteMapping("/delete")
     public ResponseEntity<Void> delete(@RequestBody List<Long> ids){
         inventoryService.delete(ids);

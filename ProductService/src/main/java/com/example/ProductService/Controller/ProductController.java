@@ -4,6 +4,10 @@ import com.example.ProductService.Dto.Product;
 import com.example.ProductService.Dto.VerifyProduct;
 import com.example.ProductService.Entities.Products;
 import com.example.ProductService.Service.ProductService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -18,7 +22,11 @@ import java.util.Map;
 public class ProductController {
     @Autowired
     private ProductService productService;
-
+    @GetMapping("/search")
+    public ResponseEntity<Page<Product>> searchProduct(@RequestParam String keyword,@RequestParam(defaultValue = "0") int page,
+                                                       @RequestParam(defaultValue = "20") int size){
+        return ResponseEntity.ok().body(productService.search(keyword,page,size));
+    }
     @PostMapping("/add")
     public ResponseEntity<List<Product>> addProduct(@RequestBody List<Product> product){
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.addProduct(product));
@@ -34,6 +42,11 @@ public class ProductController {
     @PatchMapping("/update/{id}")
     public ResponseEntity<Product> updateProduct(@PathVariable Long id, @RequestBody Map<String,Object> mp){
         return new ResponseEntity<>(productService.updateProduct(id,mp),HttpStatus.OK);
+    }
+    @DeleteMapping("/deleteAll")
+    public ResponseEntity<Void> deleteAll(){
+        productService.deleteAll();
+        return ResponseEntity.noContent().build();
     }
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Map<String ,String>> delete(@PathVariable Long id){

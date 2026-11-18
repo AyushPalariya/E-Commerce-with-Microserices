@@ -7,9 +7,20 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="ConfigServer" />
         <module name="EurekaDiscovery" />
         <module name="ApiGateway" />
         <module name="AdminServer" />
+      </profile>
+      <profile name="Annotation profile for AuthService" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+        </processorPath>
+        <module name="UserService" />
+        <module name="AuthService" />
       </profile>
       <profile name="Annotation profile for ProductService" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -24,16 +35,6 @@
         <module name="PaymentService" />
         <module name="InventoryService" />
       </profile>
-      <profile name="Annotation profile for UserService" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-        </processorPath>
-        <module name="UserService" />
-        <module name="AuthService" />
-      </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
       <module name="UserDemo" target="17" />
@@ -44,6 +45,7 @@
       <module name="AdminServer" options="-parameters" />
       <module name="ApiGateway" options="-parameters" />
       <module name="AuthService" options="-parameters" />
+      <module name="ConfigServer" options="-parameters" />
       <module name="EmailService" options="-parameters" />
       <module name="EurekaDiscovery" options="-parameters" />
       <module name="InventoryService" options="-parameters" />

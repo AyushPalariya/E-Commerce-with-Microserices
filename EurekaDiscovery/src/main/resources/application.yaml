@@ -1,12 +1,7 @@
 spring:
   application:
     name: EurekaDiscovery
+  config:
+    import: configserver:${CONFIG_SERVER_URL:http://localhost:8078}
 
-eureka:
-  client:
-    register-with-eureka: false
-    fetch-registry: false
-    serviceUrl:
-      defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
-server:
-  port: ${EUREKA_PORT:8081}
+

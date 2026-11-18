@@ -21,6 +21,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -132,7 +133,10 @@ public class PaymentService {
             //Email kafka
             //getDataFromCacheOfOrderPlace
             OrderPlace cacheOrder = cacheService.getOrderPlace(orderId);
+            List<ItemDto> list = cacheOrder.getItems().stream().toList();
+
             log.info("order get from cache:{}",cacheOrder);
+            log.info("List of items:{}",list);
             OrderPaymentEmail emailSend=new OrderPaymentEmail(raz_orderId,raz_paymentId,cacheOrder);
             try {
                 template.send(topic, raz_orderId,emailSend);

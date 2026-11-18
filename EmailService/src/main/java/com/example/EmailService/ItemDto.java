@@ -13,4 +13,7 @@ public class ItemDto {
     private String product_name;
     private int quantities;
     private double subAmount;
+    private double perAmount;
+    private String color;
+    private String size;
 }

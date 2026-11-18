@@ -1,32 +1,5 @@
 spring:
   application:
     name: ProductService
-
-  datasource:
-    url: ${PRODUCT_DB_URL:jdbc:mysql://localhost:3306/ZecProductDB}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    database-platform: org.hibernate.dialect.MySQLDialect
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-
-server:
-  port: ${PRODUCT_SERVICE_PORT:8084}
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
-  instance:
-    prefer-ip-address: true
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "*"
+  config:
+    import: configserver:${CONFIG_SERVER_URL:http://localhost:8078}

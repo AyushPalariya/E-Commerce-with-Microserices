@@ -18,4 +18,7 @@ public class ItemDto implements Serializable {
     private String product_name;//include in response
     private Long quantities;
     private Double subAmount;//include in response
+    private Double perAmount;
+    private String color;
+    private String size;
 }

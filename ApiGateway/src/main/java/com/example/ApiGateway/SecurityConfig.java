@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import jakarta.servlet.DispatcherType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -25,6 +26,7 @@ public class SecurityConfig {
             {       //after testing products define role ADMIN
                     "/products/**",
                     "/auth/**",
+                    "/home/**",
                     "/actuator/**",
                     //after testing user/getAllProfile and order/getAllOrders define role ADMIN
                     "/user/getAllProfile",
@@ -41,11 +43,13 @@ public class SecurityConfig {
                 .httpBasic(b->b.disable())
                 .sessionManagement((sm)->sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(req->req
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/auth/delete/{email}").hasAnyRole("USER","ADMIN")
                         .requestMatchers(publicUrls).permitAll()
                         .requestMatchers("/user/**").hasAnyRole("ADMIN","USER")
                         .requestMatchers("/order/**").hasAnyRole("USER","ADMIN")
                         .requestMatchers("/payment/**").hasAnyRole("USER","ADMIN")
+                        .requestMatchers("/products/search").hasAnyRole("ADMIN","USER")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex->ex.authenticationEntryPoint((request, response, authException) ->

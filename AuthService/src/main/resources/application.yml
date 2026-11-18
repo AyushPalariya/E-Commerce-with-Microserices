@@ -1,59 +1,6 @@
 spring:
   application:
     name: AuthService
+  config:
+    import: configserver:${CONFIG_SERVER_URL:http://localhost:8078}
 
-  datasource:
-    url: ${AUTH_DB_URL:jdbc:mysql://localhost:3306/ZecAuthDB}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    database-platform: org.hibernate.dialect.MySQLDialect
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVER:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        spring.json.add.type.headers: true
-kafka:
-  topic:
-    name: profile
-    reset: forgot
-    getOtp: sendOtp
-
-server:
-  port: ${AUTH_SERVICE_PORT:8082}
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: ${EUREKA_URL:http://localhost:8081/eureka/}
-    register-with-eureka: true
-    fetch-registry: true
-  instance:
-    prefer-ip-address: true
-
-security:
-  jwt:
-    key: ${JWT_KEY:djaijdfnneijrie834382njnefnsdfekwapiwej02393wjnrefejwfnfslaeialewer323nnfioeje33}
-    rftAccessible: ${JWT_RFT_ACCESSIBLE:12000}
-    actAccessible: ${JWT_ACT_ACCESSIBLE:600}
-    cookie:
-      refreshTokenName: ${COOKIE_NAME:refreshToken}
-      httpOnly: true
-      secure: true
-      domain: ${COOKIE_DOMAIN:localhost}
-      sameSite: ${COOKIE_SITE:lax}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "*"

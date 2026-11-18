@@ -74,9 +74,12 @@ public class EmailService {
         for (int i = 0; i < list.size(); i++) {
             ItemDto item = list.get(i);
             orderDetails.append(i + 1).append(". ")
-                    .append(item.getProduct_name()).append("\n")
+                    .append("Name: "+item.getProduct_name()).append("\n")
+                    .append("   Color: ").append(item.getColor()).append("\n")
+                    .append("   Size: ").append(item.getSize()).append("\n")
                     .append("   Quantity: ").append(item.getQuantities()).append("\n")
-                    .append("   Amount: ₹").append(item.getSubAmount()).append("\n\n");
+                    .append("   Price per item: ₹").append(item.getPerAmount()).append("\n")
+                    .append("   Line total: ₹").append(item.getSubAmount()).append("\n\n");
         }
         orderDetails.append("Total Amount: ")
                 .append(orderPlace.getOrder().getTotalAmount())

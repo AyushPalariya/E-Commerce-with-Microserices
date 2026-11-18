@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -263,5 +262,10 @@ public class InventoryService {
         }
         inventoryRepo.saveAll(inventories.values());
         reservationRepo.saveAll(reservations);
+    }
+
+    public List<Long> maxSold() {
+        List<InventoryEntity> result=inventoryRepo.findAllByOrderBySoldQuantityDesc();
+        return result.stream().map(InventoryEntity::getProductId).toList();
     }
 }
