@@ -36,4 +36,6 @@ public interface ProductRepo extends JpaRepository<Products,Long> {
 
 
     Page<Products> findAllByIdIn(List<Long> productIdsWithMaxSold, Pageable pageable);
+
+    Page<Products> findAllByCategoryIgnoreCase(String category, Pageable pageable);
 }

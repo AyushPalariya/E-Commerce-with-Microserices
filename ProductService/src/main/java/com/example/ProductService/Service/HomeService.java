@@ -102,4 +102,16 @@ public class HomeService {
         product.setDiscountAmount(p.getDiscountAmount());
         return product;
     }
+
+    public Page<Product> getCategoriesProducts(String category,int page,int size) {
+        if(category==null||category.isBlank()) throw new BadRequestException("Please provide category name!");
+        if (page < 0 || size <= 0) {
+            throw new BadRequestException("Invalid pagination parameters!");
+        }
+        size=Math.min(size,14);
+        Pageable pageable=PageRequest.of(page,size);
+        Page<Products> result=productRepo.findAllByCategoryIgnoreCase(category,pageable);
+        if(result.isEmpty()||page>=result.getTotalPages()) throw new BadRequestException("Page does not exist!");
+        return result.map(this::toDto);
+    }
 }
