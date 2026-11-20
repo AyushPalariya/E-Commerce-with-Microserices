@@ -2,6 +2,7 @@ package com.example.InventoryService.Repository;
 
 import com.example.InventoryService.Dto.Product;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -11,5 +12,5 @@ import java.util.List;
 public interface ProductClientInterface {
 
     @PostMapping("/products/verify")
-    List<Product> verifyProductIds(@RequestBody List<Product> productList);
+    ResponseEntity<List<Product>> verifyProductIds(@RequestBody List<Product> productList);
 }

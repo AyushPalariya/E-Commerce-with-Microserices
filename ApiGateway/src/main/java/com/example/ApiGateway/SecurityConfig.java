@@ -14,11 +14,13 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.time.LocalDateTime;
 import java.util.Map;
 
 @Configuration
+@EnableWebMvc
 public class SecurityConfig {
     @Autowired
     private JwtFilter jwtFilter;
@@ -33,7 +35,19 @@ public class SecurityConfig {
                     "/order/getAllOrders",
                     "/payment/webhooks",
                     //after testing define admin role
-                    "/inventory/**"
+                    "/inventory/**",
+                    //swagger
+                    "/swagger-ui/**",
+                    "/webjars/**",
+                    "/swagger-resources/**",
+                    "/swagger-ui.html/**",
+                    "/v3/api-docs/**",
+                    "/user/v3/api-docs/**",
+                    "/auth/v3/api-docs/**",
+                    "/products/v3/api-docs/**",
+                    "/payment/v3/api-docs/**",
+                    "/order/v3/api-docs/**",
+                    "/inventory/v3/api-docs/**"
             };
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity){

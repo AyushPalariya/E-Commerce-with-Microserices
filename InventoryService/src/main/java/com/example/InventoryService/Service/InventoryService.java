@@ -69,13 +69,13 @@ public class InventoryService {
         });
         List<InventoryEntity> allByProductIdIn = inventoryRepo.findAllByProductIdIn(productIds);
         if(!allByProductIdIn.isEmpty()) throw new BadRequestExceptionClass("ProductId already present");
-        List<Product> products=feignClientInterface.verifyProductIds(productList);
+        List<Product> products=feignClientInterface.verifyProductIds(productList).getBody();
         log.info("products are :{}",products);
     }
     @Transactional
     @CacheEvict(value = {"allInventoryV2","inventoryV2"},allEntries = true)
     public void delete(List<Long> ids) {
-        if(ids==null||ids.isEmpty()) throw new BadRequestExceptionClass("ids must be entered by you!");
+        if(ids==null||ids.isEmpty()) throw new BadRequestExceptionClass("Required ids");
         inventoryRepo.deleteAllById(ids);
         log.info("inventorys deleted:{}",ids);
     }
@@ -115,9 +115,9 @@ public class InventoryService {
                 .toList();
     }
     @Transactional
-    @Cacheable(value = "inventoryV2",key = "#inventory.productId")
-    public Inventory getStock(Inventory inventory){
-        InventoryEntity in = inventoryRepo.findByProductId(inventory.getProductId()).orElseThrow(() -> new BadRequestExceptionClass("product not found with productId:" + inventory.getProductId()));
+    @Cacheable(value = "inventoryV2",key = "#proId")
+    public Inventory getStock(Long proId){
+        InventoryEntity in = inventoryRepo.findByProductId(proId).orElseThrow(() -> new BadRequestExceptionClass("product not found with productId:" + proId));
         log.info("inventory get with productId:{}",in.getProductId());
         return new Inventory(in.getId(),in.getName(),in.getProductId(),in.getTotalQuantity(),currentAvailableQuantity(in),
                 in.getReservedQuantity(),in.getSoldQuantity());
@@ -267,5 +267,10 @@ public class InventoryService {
     public List<Long> maxSold() {
         List<InventoryEntity> result=inventoryRepo.findAllByOrderBySoldQuantityDesc();
         return result.stream().map(InventoryEntity::getProductId).toList();
+    }
+
+    public void deleteAll() {
+        inventoryRepo.deleteAll();
+        log.info("Inventory data deleted success");
     }
 }

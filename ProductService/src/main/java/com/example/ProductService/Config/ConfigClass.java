@@ -1,5 +1,10 @@
 package com.example.ProductService.Config;
 
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
+import io.swagger.v3.oas.annotations.servers.Server;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
@@ -12,6 +17,17 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import java.time.Duration;
 
 @Configuration
+@OpenAPIDefinition(info = @Info(
+        title = "Home and Products",
+        version = "1.0",
+        description = "Rest Apis for Home and Products"
+),servers = @Server(url = "${API_GATEWAY_URL:http://localhost:8080}"))
+@SecurityScheme(
+        name = "bearerAuth",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT"
+)
 public class ConfigClass {
 
     @Value("${spring.data.redis.host}")

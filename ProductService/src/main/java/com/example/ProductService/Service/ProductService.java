@@ -8,13 +8,16 @@ import com.example.ProductService.ExceptionHandle.BadRequestException;
 import com.example.ProductService.ExceptionHandle.ConflictException;
 import com.example.ProductService.ExceptionHandle.ProductIdsNotFound;
 import com.example.ProductService.ExceptionHandle.ResourceNotFound;
+import com.example.ProductService.Repository.InventoryFeign;
 import com.example.ProductService.Repository.ProductRepo;
+import feign.FeignException;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,9 +36,19 @@ import java.util.stream.Collectors;
 public class ProductService {
     @Autowired
     private ProductRepo productRepo;
+    @Autowired
+    private InventoryFeign inventoryFeign;
 
     @Transactional
-    @CacheEvict(value = "product", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "product", allEntries = true),
+            @CacheEvict(value = "allProducts", allEntries = true),
+            @CacheEvict(value = "newProducts",allEntries = true),
+            @CacheEvict(value = "categoriesName",allEntries = true),
+            @CacheEvict(value = "trending",allEntries = true),
+            @CacheEvict(value = "categoryProducts",allEntries = true),
+            @CacheEvict(value = "searchProducts",allEntries = true)
+    })
     public List<Product> addProduct(List<Product> products) {
         if (products == null || products.isEmpty()) throw new BadRequestException("At least one product is required!");
         List<Products> pp=new ArrayList<>();
@@ -56,9 +69,6 @@ public class ProductService {
             if (product.getDiscountPercentage() != null
                     && (product.getDiscountPercentage() < 0 || product.getDiscountPercentage() > 100))
                 throw new BadRequestException("Discount percentage must be between 0 and 100!");
-            if (product.getDiscountAmount() != null
-                    && (!Double.isFinite(product.getDiscountAmount()) || product.getDiscountAmount() < 0))
-                throw new BadRequestException("Discount amount must be non-negative!");
             pp.add(toEntity(product));
         }
         List<Products> allProducts=productRepo.saveAll(pp);
@@ -72,7 +82,15 @@ public class ProductService {
         Products p= productRepo.findById(id).orElseThrow(()->new ResourceNotFound("Product not found with id: "+id));
         return toDto(p);
     }
-    @CacheEvict(value = "product",allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "product", allEntries = true),
+            @CacheEvict(value = "allProducts", allEntries = true),
+            @CacheEvict(value = "newProducts",allEntries = true),
+            @CacheEvict(value = "categoriesName",allEntries = true),
+            @CacheEvict(value = "trending",allEntries = true),
+            @CacheEvict(value = "categoryProducts",allEntries = true),
+            @CacheEvict(value = "searchProducts",allEntries = true)
+    })
     @Transactional
     public Product updateProduct(Long id, Map<String,Object> mp){
         if (mp == null || mp.isEmpty()) throw new BadRequestException("Product fields are required!");
@@ -89,8 +107,11 @@ public class ProductService {
                 case "size" -> p.setSize(asStringList(value, key));
                 case "color" -> p.setColor(asStringList(value, key));
                 case "gender" -> p.setGender(asGender(value));
-                case "discountPercentage" -> p.setDiscountPercentage(asLong(value, key));
-                case "discountAmount" -> p.setDiscountAmount(asDouble(value, key));
+                case "discountPercentage" ->{
+                    p.setDiscountPercentage(asLong(value, key));
+                    double disAmount=(p.getAmount()*p.getDiscountPercentage())/100.0;
+                    p.setDiscountAmount(disAmount);
+                }
                 case "avgRating" -> p.setAvgRating(asDouble(value, key));
                 default -> throw new BadRequestException("Unsupported product field: " + key);
             }
@@ -107,28 +128,66 @@ public class ProductService {
         if (p.getDiscountPercentage() != null
                 && (p.getDiscountPercentage() < 0 || p.getDiscountPercentage() > 100))
             throw new BadRequestException("Discount percentage must be between 0 and 100!");
-        if (p.getDiscountAmount() != null
-                && (!Double.isFinite(p.getDiscountAmount()) || p.getDiscountAmount() < 0))
-            throw new BadRequestException("Discount amount must be non-negative!");
         p=productRepo.save(p);
         return toDto(p);
     }
 
-    @CacheEvict(value = "product",allEntries = true)
-    public Map<String,String> deleteProduct(Long id){
-        if (id == null || id <= 0) throw new BadRequestException("Product id must be positive!");
-        if(!productRepo.existsById(id)) throw new ResourceNotFound("Product not found with id: "+id);
-        productRepo.deleteById(id);
+    @Caching(evict = {
+            @CacheEvict(value = "product", allEntries = true),
+            @CacheEvict(value = "allProducts", allEntries = true),
+            @CacheEvict(value = "newProducts",allEntries = true),
+            @CacheEvict(value = "categoriesName",allEntries = true),
+            @CacheEvict(value = "trending",allEntries = true),
+            @CacheEvict(value = "categoryProducts",allEntries = true),
+            @CacheEvict(value = "searchProducts",allEntries = true)
+    })
+    @Transactional
+    public Map<String,String> deleteProduct(List<Long> ids){
+        if (ids == null || ids.isEmpty()) {
+            throw new BadRequestException("Product IDs cannot be empty!");
+        }
+        if (ids.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new BadRequestException("Product IDs must be positive!");
+        }
+        List<Long> uniqueIds = ids.stream()
+                .distinct()
+                .toList();
+        for(Long id:uniqueIds){
+            if(!productRepo.existsById(id)) throw new BadRequestException("Product with id "+id+" not found!");
+        }
+        try {
+            inventoryFeign.deleteInventoryDataWithIds(uniqueIds).getBody();
+            log.info("inventory data deleted");
+        }
+        catch (FeignException e){
+            throw new BadRequestException("Unable to delete data from inventory service");
+        }
+        productRepo.deleteAllById(uniqueIds);
         System.out.println("product deleted!");
         return Map.of("SUCCESS","Product is successfully deleted.");
     }
-    @Cacheable(value = "product", key = "'all'")
+    @Cacheable(value = "allProducts", key = "#page + '-' + T(java.lang.Math).min(#size, 20)")
     @Transactional
-    public List<Product> getAllProduct(){
-        return productRepo.findAll().stream().map(this::toDto).toList();
+    public Page<Product> getAllProduct(int page,int size){
+        if (page < 0 || size <= 0) {
+            throw new BadRequestException("Invalid pagination parameters!");
+        }
+        size=Math.min(size,20);
+        Pageable pageable=PageRequest.of(page,size);
+        Page<Products> result=productRepo.findAll(pageable);
+        if(result.isEmpty()||result.getTotalPages()<=page) throw new BadRequestException("Page does not exist");
+        return result.map(this::toDto);
     }
 
-    @CacheEvict(value = "product", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "product", allEntries = true),
+            @CacheEvict(value = "allProducts", allEntries = true),
+            @CacheEvict(value = "newProducts",allEntries = true),
+            @CacheEvict(value = "categoriesName",allEntries = true),
+            @CacheEvict(value = "trending",allEntries = true),
+            @CacheEvict(value = "categoryProducts",allEntries = true),
+            @CacheEvict(value = "searchProducts",allEntries = true)
+    })
     public void clearProductCache() {
         System.out.println("Product cache cleared!");
     }
@@ -155,6 +214,10 @@ public class ProductService {
         return verify;
     }
     @Transactional
+    @Cacheable(
+            value = "searchProducts",
+            key = "#keyword.trim().toLowerCase() + '-' + #page + '-' + T(java.lang.Math).min(#size, 20)"
+    )
     public Page<Product> search(String keyword, int page, int size){
         if(keyword==null||keyword.isBlank()) throw new BadRequestException("Please search something!");
         if (page < 0 || size <= 0) {
@@ -190,14 +253,17 @@ public class ProductService {
         entity.setCategory(product.getCategory());
         entity.setDescription(product.getDescription());
         entity.setImg(product.getImg());
-        entity.setAmount(product.getAmount());
+        double amount=product.getAmount();
+        entity.setAmount(amount);
         entity.setName(product.getName());
         entity.setColor(product.getColor());
         entity.setSize(product.getSize());
         entity.setAvgRating(product.getAvgRating());
         entity.setGender(product.getGender());
-        entity.setDiscountPercentage(product.getDiscountPercentage());
-        entity.setDiscountAmount(product.getDiscountAmount());
+        Long disPer=product.getDiscountPercentage();
+        entity.setDiscountPercentage(disPer);
+        double disAmount=(disPer*amount)/100.0;
+        entity.setDiscountAmount(disAmount);
         return entity;
     }
 
@@ -236,8 +302,26 @@ public class ProductService {
             throw new BadRequestException("gender must be MALE or FEMALE!");
         }
     }
-
+    @Caching(evict = {
+            @CacheEvict(value = "product", allEntries = true),
+            @CacheEvict(value = "allProducts", allEntries = true),
+            @CacheEvict(value = "newProducts",allEntries = true),
+            @CacheEvict(value = "categoriesName",allEntries = true),
+            @CacheEvict(value = "trending",allEntries = true),
+            @CacheEvict(value = "categoryProducts",allEntries = true),
+            @CacheEvict(value = "searchProducts",allEntries = true)
+    })
+    @Transactional
     public void deleteAll() {
+        try {
+            inventoryFeign.deleteAllInventoryData().getBody();
+            log.info("Inventory data deleted successfully");
+        } catch (FeignException ex) {
+            log.error("Failed to delete inventory data: {}", ex.getMessage());
+            throw new BadRequestException(
+                    "Unable to delete inventory data. Products were not deleted."
+            );
+        }
         productRepo.deleteAll();
         log.info("deleteAll Products");
     }

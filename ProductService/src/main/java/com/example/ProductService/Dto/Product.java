@@ -24,5 +24,5 @@ public class Product implements Serializable {
     private Double avgRating;
     private Gender gender;
     private Long discountPercentage;
-    private Double discountAmount;
+    private Double discountAmount;//not include in coming request
 }

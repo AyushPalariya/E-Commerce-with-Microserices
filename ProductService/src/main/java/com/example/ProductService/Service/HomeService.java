@@ -6,6 +6,7 @@ import com.example.ProductService.ExceptionHandle.BadRequestException;
 import com.example.ProductService.Repository.InventoryFeign;
 import com.example.ProductService.Repository.ProductRepo;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,10 @@ public class HomeService {
 
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            value = "newProducts",
+            key = "#page + '-' + T(java.lang.Math).min(#size, 14)"
+    )
     public Page<Product> newProducts(int page, int size) {
         if (page < 0 || size <= 0) {
             throw new BadRequestException("Invalid pagination parameters!");
@@ -39,11 +44,14 @@ public class HomeService {
         return result.map(this::toDto);
     }
 
-
+    @Cacheable(value = "categoriesName", key = "'all'")
     public List<String> getCategories() {
         return productRepo.findAllByCategories();
     }
-
+    @Cacheable(
+            value = "trending",
+            key = "#page + '-' + T(java.lang.Math).min(#size, 14)"
+    )
     @Transactional(readOnly = true)
     public Page<Product> trending(int page, int size) {
 
@@ -56,7 +64,7 @@ public class HomeService {
         size = Math.min(size, 14);
         Pageable pageable = PageRequest.of(page, size);
 
-        List<Long> ids = inventoryFeign.getProductIdsWithMaxSold();
+        List<Long> ids = inventoryFeign.getProductIdsWithMaxSold().getBody();
 
         if (ids == null || ids.isEmpty()) {
             throw new BadRequestException("Page does not exist!");
@@ -102,7 +110,11 @@ public class HomeService {
         product.setDiscountAmount(p.getDiscountAmount());
         return product;
     }
-
+    @Transactional
+    @Cacheable(
+            value = "categoryProducts",
+            key = "#category.toLowerCase() + '-' + #page + '-' + T(java.lang.Math).min(#size, 14)"
+    )
     public Page<Product> getCategoriesProducts(String category,int page,int size) {
         if(category==null||category.isBlank()) throw new BadRequestException("Please provide category name!");
         if (page < 0 || size <= 0) {

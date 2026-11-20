@@ -23,6 +23,7 @@ public class EnvTest implements CommandLineRunner {
         System.out.println(
                 "REDIS HOST: " + System.getenv("REDIS_HOST")
         );
+        System.out.println("APIGATEWAY URL "+ System.getenv("API_GATEWAY_URL"));
 
         System.out.println(
                 "KAFKA SERVER: " +

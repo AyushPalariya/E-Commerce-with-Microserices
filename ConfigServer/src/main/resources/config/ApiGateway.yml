@@ -4,6 +4,50 @@ spring:
       server:
         webmvc:
           routes:
+            #swagger
+            - id: AUTH-SWAGGER
+              uri: lb://AUTHSERVICE
+              predicates:
+                - Path=/auth/v3/api-docs
+              filters:
+                - StripPrefix=1
+
+            - id: USER-SWAGGER
+              uri: lb://USERSERVICE
+              predicates:
+                - Path=/user/v3/api-docs
+              filters:
+                - StripPrefix=1
+
+            - id: PRODUCT-SWAGGER
+              uri: lb://PRODUCTSERVICE
+              predicates:
+                - Path=/products/v3/api-docs
+              filters:
+                - StripPrefix=1
+
+            - id: ORDER-SWAGGER
+              uri: lb://ORDERSERVICE
+              predicates:
+                - Path=/order/v3/api-docs
+              filters:
+                - StripPrefix=1
+
+            - id: PAYMENT-SWAGGER
+              uri: lb://PAYMENTSERVICE
+              predicates:
+                - Path=/payment/v3/api-docs
+              filters:
+                - StripPrefix=1
+
+            - id: INVENTORY-SWAGGER
+              uri: lb://INVENTORYSERVICE
+              predicates:
+                - Path=/inventory/v3/api-docs
+              filters:
+                - StripPrefix=1
+
+            #normal routes
             - id: AUTH-SERVICE
               uri: lb://AUTHSERVICE
               predicates:
@@ -30,6 +74,7 @@ spring:
                 - Path=/inventory/**
 
 
+
 security:
   jwt:
     key: ${JWT_KEY:djaijdfnneijrie834382njnefnsdfekwapiwej02393wjnrefejwfnfslaeialewer323nnfioeje33}
@@ -50,3 +95,25 @@ management:
     web:
       exposure:
         include: "*"
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: AuthService
+        url: /auth/v3/api-docs
+
+      - name: UserService
+        url: /user/v3/api-docs
+
+      - name: ProductService
+        url: /products/v3/api-docs
+
+      - name: OrderService
+        url: /order/v3/api-docs
+
+      - name: PaymentService
+        url: /payment/v3/api-docs
+
+      - name: InventoryService
+        url: /inventory/v3/api-docs

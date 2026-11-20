@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,8 @@ public class OrderService {
     @Autowired
     private InventoryClient inventoryClient;
 
-    @CacheEvict(value = "userOrder",allEntries = true)
+    @Caching(evict ={ @CacheEvict(value = "userOrder",allEntries = true),
+                     @CacheEvict(value = "allOrders",allEntries = true)   })
     @Transactional
     public OrderPlace orderPlace(OrderPlace orderPlace,String email,Long userid){
         validateOrder(orderPlace, email, userid);
@@ -137,7 +139,7 @@ public class OrderService {
 
         return orderPlace1;
     }
-
+    @Cacheable(value = "allOrders",key = "'all'")
     @Transactional(readOnly = true)
     public List<OrderPlace> getAllOrder() {
         List<OrderEntity> all = orderRepo.findAllOrderWithItems();
@@ -218,7 +220,8 @@ public class OrderService {
         }
         return place;
     }
-    @CacheEvict(value = "userOrder",key = "#userId")
+    @Caching(evict ={ @CacheEvict(value = "userOrder",allEntries = true),
+            @CacheEvict(value = "allOrders",allEntries = true)   })
     public void deleteOrder(Long orderId,Long userId) {
         orderRepo.deleteById(orderId);
         System.out.println("order delete with orderId:"+orderId);

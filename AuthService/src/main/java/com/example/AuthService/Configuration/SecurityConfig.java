@@ -16,6 +16,18 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
 
+    private String[] public_urls={
+            //swagger
+            "/swagger-ui/**",
+            "/webjars/**",
+            "/swagger-resources/**",
+            "/swagger-ui.html/**",
+            "/v3/api-docs/**",
+            "/auth/v3/api-docs/**",
+            //auth
+            "/auth/**",
+            "/actuator/**"
+    };
     @Bean
     public PasswordEncoder passwordEncoder(){
         return new BCryptPasswordEncoder();
@@ -28,7 +40,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity){
         httpSecurity.csrf((csrf)->csrf.disable())
                 .sessionManagement((sm)->sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(req-> req.requestMatchers("/auth/**","/actuator/**").permitAll()
+                .authorizeHttpRequests(req-> req.requestMatchers(public_urls).permitAll()
                         .anyRequest().authenticated());
         return httpSecurity.build();
     }
