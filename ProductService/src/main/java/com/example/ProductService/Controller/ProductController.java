@@ -29,6 +29,8 @@ import java.util.Map;
 public class ProductController {
     @Autowired
     private ProductService productService;
+
+
     @Operation(summary = "Get Product by searching",description = "Take RequestParam with matching keywords, default page 0 and size 20")
     @GetMapping("/search")
     public ResponseEntity<Page<Product>> searchProduct(@RequestParam String keyword,@RequestParam(defaultValue = "0") int page,

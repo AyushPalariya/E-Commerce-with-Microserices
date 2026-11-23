@@ -24,12 +24,12 @@ public class Products implements Serializable {
     private String img;
     private Double amount;
     private String name;
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "product_colors", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "color", nullable = false)
     @OrderColumn(name = "color_order")
     private List<String> color;
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "product_sizes", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "size", nullable = false)
     @OrderColumn(name = "size_order")

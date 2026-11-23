@@ -14,6 +14,8 @@ import feign.FeignException;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -29,6 +31,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,7 +41,8 @@ public class ProductService {
     private ProductRepo productRepo;
     @Autowired
     private InventoryFeign inventoryFeign;
-
+    @Autowired
+    private CacheManager cacheManager;
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "product", allEntries = true),
@@ -47,7 +51,8 @@ public class ProductService {
             @CacheEvict(value = "categoriesName",allEntries = true),
             @CacheEvict(value = "trending",allEntries = true),
             @CacheEvict(value = "categoryProducts",allEntries = true),
-            @CacheEvict(value = "searchProducts",allEntries = true)
+            @CacheEvict(value = "searchProducts",allEntries = true),
+            @CacheEvict(value = "recentlyProducts",allEntries = true)
     })
     public List<Product> addProduct(List<Product> products) {
         if (products == null || products.isEmpty()) throw new BadRequestException("At least one product is required!");
@@ -89,7 +94,8 @@ public class ProductService {
             @CacheEvict(value = "categoriesName",allEntries = true),
             @CacheEvict(value = "trending",allEntries = true),
             @CacheEvict(value = "categoryProducts",allEntries = true),
-            @CacheEvict(value = "searchProducts",allEntries = true)
+            @CacheEvict(value = "searchProducts",allEntries = true),
+            @CacheEvict(value = "recentlyProducts",allEntries = true)
     })
     @Transactional
     public Product updateProduct(Long id, Map<String,Object> mp){
@@ -139,7 +145,8 @@ public class ProductService {
             @CacheEvict(value = "categoriesName",allEntries = true),
             @CacheEvict(value = "trending",allEntries = true),
             @CacheEvict(value = "categoryProducts",allEntries = true),
-            @CacheEvict(value = "searchProducts",allEntries = true)
+            @CacheEvict(value = "searchProducts",allEntries = true),
+            @CacheEvict(value = "recentlyProducts",allEntries = true)
     })
     @Transactional
     public Map<String,String> deleteProduct(List<Long> ids){
@@ -186,7 +193,8 @@ public class ProductService {
             @CacheEvict(value = "categoriesName",allEntries = true),
             @CacheEvict(value = "trending",allEntries = true),
             @CacheEvict(value = "categoryProducts",allEntries = true),
-            @CacheEvict(value = "searchProducts",allEntries = true)
+            @CacheEvict(value = "searchProducts",allEntries = true),
+            @CacheEvict(value = "recentlyProducts",allEntries = true)
     })
     public void clearProductCache() {
         System.out.println("Product cache cleared!");
@@ -309,7 +317,8 @@ public class ProductService {
             @CacheEvict(value = "categoriesName",allEntries = true),
             @CacheEvict(value = "trending",allEntries = true),
             @CacheEvict(value = "categoryProducts",allEntries = true),
-            @CacheEvict(value = "searchProducts",allEntries = true)
+            @CacheEvict(value = "searchProducts",allEntries = true),
+            @CacheEvict(value = "recentlyProducts",allEntries = true)
     })
     @Transactional
     public void deleteAll() {
@@ -325,4 +334,5 @@ public class ProductService {
         productRepo.deleteAll();
         log.info("deleteAll Products");
     }
+
 }

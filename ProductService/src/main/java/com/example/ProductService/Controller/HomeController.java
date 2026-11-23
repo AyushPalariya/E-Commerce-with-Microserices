@@ -3,6 +3,7 @@ package com.example.ProductService.Controller;
 import com.example.ProductService.Dto.Product;
 import com.example.ProductService.Service.HomeService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -18,7 +19,7 @@ public class HomeController {
     private HomeService homeService;
     //user
     @Operation(summary = "Get new Products that added recently",description = "Take requestParam with default page 0 and size 14")
-    @GetMapping("/recent")
+    @GetMapping("/newProducts")
     public ResponseEntity<Page<Product>> newProducts(@RequestParam(defaultValue = "0") int page,
                                                      @RequestParam(defaultValue = "14") int size){
         return ResponseEntity.ok(homeService.newProducts(page,size));
@@ -41,6 +42,20 @@ public class HomeController {
     public ResponseEntity<Page<Product>> getTrendingProducts(@RequestParam(defaultValue = "0") int page,
                                                              @RequestParam(defaultValue = "14") int size){
         return ResponseEntity.ok(homeService.trending(page,size));
+    }
+
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Add recently viewed product in Redis",description = "Required accessToken of user or admin")
+    @PostMapping("/recently-viewed/{productId}")
+    public ResponseEntity<List<Product>> addRecentlyView(@PathVariable Long productId,@RequestHeader("X-Authenticated-User-Id") Long userId){
+        return ResponseEntity.ok(homeService.addRecentlyProduct(productId,userId));
+    }
+
+    @Operation(summary = "get recently viewed Products in list from Redis",description = "Required accessToken of user Or Admin")
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping("/revently-viewed")
+    public ResponseEntity<List<Product>> getRecentlyView(@RequestHeader("X-Authenticated-User-Id") Long userId){
+        return ResponseEntity.ok(homeService.getRecentlyView(userId));
     }
 
 }
