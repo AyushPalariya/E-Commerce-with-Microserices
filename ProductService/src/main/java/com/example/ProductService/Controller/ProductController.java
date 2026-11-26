@@ -38,7 +38,7 @@ public class ProductController {
         return ResponseEntity.ok().body(productService.search(keyword,page,size));
     }
     //admin
-    @Operation(summary = "Add new Product",description = "Give accessToken of admin in Authorization and DoesNot provide discountAmount")
+    @Operation(summary = "Add new Product",description = "Give accessToken of admin in Authorization and ProductId,SizeId and ColorId and OnSale not send when adding Products")
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/add")
     public ResponseEntity<List<Product>> addProduct(@RequestBody List<Product> product){

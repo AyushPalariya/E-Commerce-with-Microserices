@@ -54,7 +54,6 @@ public class PaymentService {
             PaymentEntity pp=byOrderId.get();
             log.info("payment retry for orderId {}",pp.getOrderId());
             if(pp.getStatus()==Status.SUCCESS) throw new RazorpayExceptionClass("Payment already done for this order!");
-            if(pp.getStatus()==Status.FAILED) throw new RazorpayExceptionClass("Payment has failed for this order!");
             inventoryClient.markPaymentStarted(orderId);
             return new PaymentResponseDto(pp.getRaz_order_id(), pp.getAmount()*100, keyId);
         }
@@ -117,7 +116,7 @@ public class PaymentService {
             PaymentStatusOrder result = paymentRepo.findOrderIdAndStatus(raz_orderId).orElseThrow();
             if (result.getStatus() == Status.SUCCESS) return;
             update = paymentRepo.setStatusAndPaymentId(Status.FAILED,LocalDateTime.now(), raz_paymentId,raz_orderId);
-            orderClient.paymentFailed(result.getOrderId());
+            orderClient.paymentFailed(result.getOrderId()).getBody();
         }
         else if(raz_status.equals("captured")){
             PaymentStatusOrder result = paymentRepo.findOrderIdAndStatus(raz_orderId).orElseThrow();
@@ -125,11 +124,11 @@ public class PaymentService {
             System.out.println(orderId);
             System.out.println(result.getStatus());
             if(result.getStatus()==Status.SUCCESS) {
-                orderClient.paymentSucceeded(orderId);
+                orderClient.paymentSucceeded(orderId).getBody();
                 return;
             }
             update=paymentRepo.setStatusAndPaymentId(Status.SUCCESS,LocalDateTime.now(),raz_paymentId,raz_orderId);
-            orderClient.paymentSucceeded(orderId);
+            orderClient.paymentSucceeded(orderId).getBody();
             //Email kafka
             //getDataFromCacheOfOrderPlace
             OrderPlace cacheOrder = cacheService.getOrderPlace(orderId);

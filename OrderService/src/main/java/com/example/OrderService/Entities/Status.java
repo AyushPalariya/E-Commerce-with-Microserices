@@ -5,6 +5,7 @@ public enum Status {
     INVENTORY_PENDING,
     INVENTORY_FAILED,
     PAYMENT_PENDING,
+    PAYMENT_FAILED,
     PAID,
     PACKED,
     SHIPPED,

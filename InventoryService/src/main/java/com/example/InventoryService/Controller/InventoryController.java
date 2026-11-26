@@ -35,11 +35,45 @@ public class InventoryController {
                             mediaType = "application/json",
                             examples = @ExampleObject(
                                     value = """
-                {
-                    "name":"ayush",
-                    "productId":21,
-                    "totalQuantity":150
-                }
+                                            {
+                                                "name": "Modern Joggers 050",
+                                                "productId": 150,
+                                                "gender": "UNISEX",
+                                                "colors": [
+                                                  {
+                                                    "colorId": 350,
+                                                    "color": "Black",
+                                                    "images": "/images/products/050/black.jpg",
+                                                    "sizes": [
+                                                      {
+                                                        "sizeId": 550,
+                                                        "size": "S",
+                                                        "totalQuantity": 55
+                                                      },
+                                                      {
+                                                        "sizeId": 551,
+                                                        "size": "M",
+                                                        "totalQuantity": 72
+                                                      },
+                                                      {
+                                                        "sizeId": 552,
+                                                        "size": "L",
+                                                        "totalQuantity": 89
+                                                      },
+                                                      {
+                                                        "sizeId": 553,
+                                                        "size": "XL",
+                                                        "totalQuantity": 25
+                                                      },
+                                                      {
+                                                        "sizeId": 554,
+                                                        "size": "XXL",
+                                                        "totalQuantity": 42
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
                 """
                             )
                     )

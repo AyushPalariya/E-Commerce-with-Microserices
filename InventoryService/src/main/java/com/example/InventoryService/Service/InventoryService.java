@@ -1,27 +1,36 @@
 package com.example.InventoryService.Service;
 
+import com.example.InventoryService.Dto.ColorDto;
 import com.example.InventoryService.Dto.Inventory;
 import com.example.InventoryService.Dto.InventoryItem;
 import com.example.InventoryService.Dto.Product;
+import com.example.InventoryService.Dto.SizeDto;
+import com.example.InventoryService.Entities.Colors;
+import com.example.InventoryService.Entities.Gender;
 import com.example.InventoryService.Entities.InventoryEntity;
 import com.example.InventoryService.Entities.ReservationEntity;
+import com.example.InventoryService.Entities.Sizes;
 import com.example.InventoryService.Entities.Status;
 import com.example.InventoryService.Global.BadRequestExceptionClass;
-import com.example.InventoryService.Repository.ProductClientInterface;
 import com.example.InventoryService.Repository.InventoryRepo;
+import com.example.InventoryService.Repository.ProductClientInterface;
 import com.example.InventoryService.Repository.ReservationRepo;
-import jakarta.transaction.Transactional;
+import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,139 +38,229 @@ import java.util.stream.Collectors;
 public class InventoryService {
     @Autowired
     private ReservationRepo reservationRepo;
-
     @Autowired
     private InventoryRepo inventoryRepo;
     @Autowired
-    private ProductClientInterface feignClientInterface;
+    private ProductClientInterface productClient;
+
     @Transactional
-    @CacheEvict(value = {"allInventoryV2","inventoryV2"},allEntries = true)
-    public List<Inventory> add(List<Inventory> inventorys) {
-        validate(inventorys);
-        List<InventoryEntity> list=new ArrayList<>();
-        inventorys.forEach(in->{
-            InventoryEntity inventoryEntity=new InventoryEntity();
-            inventoryEntity.setName(in.getName());
-            inventoryEntity.setProductId(in.getProductId());
-            inventoryEntity.setTotalQuantity(in.getTotalQuantity());
-            inventoryEntity.setAvailableQuantity(in.getTotalQuantity());
-            list.add(inventoryEntity);
-        });
-        List<InventoryEntity> inventoryEntities = inventoryRepo.saveAll(list);
-        log.info("inventory added");
-        return convertIntoDto(inventoryEntities);
+    @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
+    public List<Inventory> add(List<Inventory> inventories) {
+        validateNewInventories(inventories);
+        List<InventoryEntity> entities = inventories.stream().map(this::toEntity).toList();
+        return toDtos(inventoryRepo.saveAll(entities));
     }
 
-    private List<Inventory> convertIntoDto(List<InventoryEntity> inventoryEntities) {
-        return inventoryEntities.stream().map(en->new Inventory(en.getId(),en.getName(),en.getProductId(),en.getTotalQuantity(),en.getAvailableQuantity()))
-                .toList();
-    }
+    private void validateNewInventories(List<Inventory> inventories) {
+        if (inventories == null || inventories.isEmpty())
+            throw new BadRequestExceptionClass("Inventory details are required!");
 
-    private void validate(List<Inventory> inventorys) {
-        List<Product> productList=new ArrayList<>();
-        List<Long> productIds=new ArrayList<>();
-        inventorys.forEach(inventory->{
-            if(inventory.getName()==null||inventory.getName().isBlank()) throw new BadRequestExceptionClass("name is required!");
-            if(inventory.getProductId()==null||inventory.getProductId()<=0) throw new BadRequestExceptionClass("productId must be valid!");
-            if(inventory.getTotalQuantity()==null||inventory.getTotalQuantity()<=0) throw new BadRequestExceptionClass("totalQuantity is required!");
-            productList.add(new Product(inventory.getProductId(),inventory.getName()));
+        List<Long> productIds = new ArrayList<>();
+        List<Product> productsToVerify = new ArrayList<>();
+        for (Inventory inventory : inventories) {
+            if (inventory == null || inventory.getName() == null || inventory.getName().isBlank())
+                throw new BadRequestExceptionClass("Product name is required!");
+            if (inventory.getProductId() == null || inventory.getProductId() <= 0)
+                throw new BadRequestExceptionClass("productId must be positive!");
+            if (inventory.getColors() == null || inventory.getColors().isEmpty())
+                throw new BadRequestExceptionClass("At least one color is required!");
+
+            Gender gender = parseGender(inventory.getGender());
+            inventory.setGender(gender == null ? null : gender.name());
             productIds.add(inventory.getProductId());
-        });
-        List<InventoryEntity> allByProductIdIn = inventoryRepo.findAllByProductIdIn(productIds);
-        if(!allByProductIdIn.isEmpty()) throw new BadRequestExceptionClass("ProductId already present");
-        List<Product> products=feignClientInterface.verifyProductIds(productList).getBody();
-        log.info("products are :{}",products);
-    }
-    @Transactional
-    @CacheEvict(value = {"allInventoryV2","inventoryV2"},allEntries = true)
-    public void delete(List<Long> ids) {
-        if(ids==null||ids.isEmpty()) throw new BadRequestExceptionClass("Required ids");
-        inventoryRepo.deleteAllById(ids);
-        log.info("inventorys deleted:{}",ids);
-    }
-    @Transactional
-    @CacheEvict(value = {"allInventoryV2","inventoryV2"},allEntries = true )
-    public void reserved(Long orderId, List<InventoryItem> items) {
-        if(orderId==null||orderId<=0) throw new BadRequestExceptionClass("orderId must be valid!");
-        List<Long> productIds=validate1(items);
-        List<InventoryEntity> inventories = inventoryRepo.findAllByProductIdIn(productIds);
-        if(inventories.size()!= productIds.size()) throw new BadRequestExceptionClass("some records are not found!");
-        Map<Long,Long> mp=items.stream().collect(Collectors.toMap(InventoryItem::getProductId,InventoryItem::getQuantities));
-        List<ReservationEntity> list=new ArrayList<>();
-        LocalDateTime expiredAt = LocalDateTime.now().plusMinutes(15);
-        for(InventoryEntity in:inventories){
-            Long dbAvailableQuantity = currentAvailableQuantity(in);
-            Long userQuantity=mp.get(in.getProductId());
-            if(userQuantity>dbAvailableQuantity) throw new BadRequestExceptionClass("Insufficient stock available of "+in.getName()+" for productId: " + in.getProductId());
-            in.setAvailableQuantity(dbAvailableQuantity-userQuantity);
-            Long reservedQuantity = in.getReservedQuantity();
-            if(reservedQuantity==null) in.setReservedQuantity(userQuantity);
-            else in.setReservedQuantity(reservedQuantity+userQuantity);
-            list.add(new ReservationEntity(orderId,in.getProductId(),userQuantity, Status.RESERVED, expiredAt));
+            productsToVerify.add(new Product(inventory.getProductId(), inventory.getName()));
+            validateColorDtos(inventory.getColors());
         }
-        List<ReservationEntity> reservationEntities = reservationRepo.saveAll(list);
-        inventories = inventoryRepo.saveAll(inventories);
-        log.info("Reserved records:{}",reservationEntities);
-        log.info("inventory update with reserved:{}",inventories);
-    }
-    @Transactional
-    @Cacheable(value = "allInventoryV2",key = "'all'")
-    public List<Inventory> getAllStock() {
-        List<InventoryEntity> all = inventoryRepo.findAll();
-        log.info("allStocks of inventory get..");
-        //dto
-        return all.stream().map(in->new Inventory(in.getId(),in.getName(),in.getProductId(),
-                in.getTotalQuantity(),currentAvailableQuantity(in),in.getReservedQuantity(),in.getSoldQuantity()))
-                .toList();
-    }
-    @Transactional
-    @Cacheable(value = "inventoryV2",key = "#proId")
-    public Inventory getStock(Long proId){
-        InventoryEntity in = inventoryRepo.findByProductId(proId).orElseThrow(() -> new BadRequestExceptionClass("product not found with productId:" + proId));
-        log.info("inventory get with productId:{}",in.getProductId());
-        return new Inventory(in.getId(),in.getName(),in.getProductId(),in.getTotalQuantity(),currentAvailableQuantity(in),
-                in.getReservedQuantity(),in.getSoldQuantity());
-    }
-    @Transactional
-    @CacheEvict(value = {"allInventoryV2","inventoryV2"},allEntries = true)
-    public List<Inventory> updateInventory(List<InventoryItem> items){
-        List<Long> productIds=validate1(items);
-        List<InventoryEntity> inventories = inventoryRepo.findAllByProductIdIn(productIds);
-        if(inventories.size()!= productIds.size()) throw new BadRequestExceptionClass("some records are not found!");
+        if (productIds.size() != productIds.stream().distinct().count())
+            throw new BadRequestExceptionClass("Duplicate product IDs are present!");
+        if (!inventoryRepo.findAllByProductIdIn(productIds).isEmpty())
+            throw new BadRequestExceptionClass("ProductId already present!");
 
-        Map<Long,Long> mp=items.stream().collect(Collectors.toMap(InventoryItem::getProductId,InventoryItem::getQuantities));
-        for(InventoryEntity in:inventories){
-            Long userQuantity=mp.get(in.getProductId());
-            in.setTotalQuantity(in.getTotalQuantity()+userQuantity);
-            Long availQuanDb = currentAvailableQuantity(in);
-            in.setAvailableQuantity(availQuanDb+userQuantity);
+        try {
+            List<Product> verified = productClient.verifyProductIds(productsToVerify).getBody();
+            if (verified == null || verified.size() != productsToVerify.size())
+                throw new BadRequestExceptionClass("One or more products could not be verified!");
+            Map<Long, String> namesById = verified.stream().collect(Collectors.toMap(
+                    Product::getId, Product::getName, (first, ignored) -> first));
+            for (Product submitted : productsToVerify) {
+                if (!submitted.getName().equalsIgnoreCase(namesById.get(submitted.getId())))
+                    throw new BadRequestExceptionClass("Product ID and name do not match: " + submitted.getId());
+            }
+        } catch (FeignException exception) {
+            throw new BadRequestExceptionClass("Unable to verify products with ProductService");
         }
-        List<InventoryEntity> updated = inventoryRepo.saveAll(inventories);
-        log.info("Stock updated ids:{}",productIds);
-        return updated.stream().map(in->new Inventory(in.getId(),in.getName(),in.getProductId(),
-                        in.getTotalQuantity(),currentAvailableQuantity(in),in.getReservedQuantity(),in.getSoldQuantity()))
-                .toList();
     }
-    public List<Long> validate1(List<InventoryItem> items){
-        if(items==null||items.isEmpty()) throw new BadRequestExceptionClass("Stock details required!");
-        List<Long> productIds=items.stream().map(update->{
-            if (update.getProductId() == null || update.getProductId() <= 0)
-                throw new BadRequestExceptionClass("Invalid productId");
 
-            if (update.getQuantities()==null||update.getQuantities() <= 0)
-                throw new BadRequestExceptionClass("Invalid quantity");
-            return update.getProductId();
+    private void validateColorDtos(List<ColorDto> colors) {
+        List<Long> colorIds = new ArrayList<>();
+        for (ColorDto color : colors) {
+            if (color == null || color.getColorId() == null || color.getColorId() <= 0)
+                throw new BadRequestExceptionClass("Each color must have a positive colorId!");
+            if (color.getColor() == null || color.getColor().isBlank())
+                throw new BadRequestExceptionClass("Color name is required!");
+            if (color.getSizes() == null || color.getSizes().isEmpty())
+                throw new BadRequestExceptionClass("Each color must have at least one size!");
+            colorIds.add(color.getColorId());
+
+            List<Long> sizeIds = new ArrayList<>();
+            for (SizeDto size : color.getSizes()) {
+                if (size == null || size.getSizeId() == null || size.getSizeId() <= 0)
+                    throw new BadRequestExceptionClass("Each size must have a positive sizeId!");
+                if (size.getSize() == null || size.getSize().isBlank())
+                    throw new BadRequestExceptionClass("Size name is required!");
+                if (size.getTotalQuantity() == null || size.getTotalQuantity() <= 0)
+                    throw new BadRequestExceptionClass("Size totalQuantity must be positive!");
+                if (sizeIds.contains(size.getSizeId()))
+                    throw new BadRequestExceptionClass("Duplicate sizeId in color: " + color.getColor());
+                sizeIds.add(size.getSizeId());
+            }
+        }
+        if (colorIds.size() != colorIds.stream().distinct().count())
+            throw new BadRequestExceptionClass("Duplicate colorIds are present!");
+    }
+
+    private InventoryEntity toEntity(Inventory inventory) {
+        InventoryEntity entity = new InventoryEntity();
+        entity.setProductId(inventory.getProductId());
+        entity.setName(inventory.getName());
+        entity.setGender(parseGender(inventory.getGender()));
+        List<Colors> colors = inventory.getColors().stream().map(colorDto -> {
+            Colors color = new Colors();
+            color.setId(colorDto.getColorId());
+            color.setColor(colorDto.getColor());
+            color.setImages(colorDto.getImages());
+            color.setInventory(entity);
+            List<Sizes> sizes = colorDto.getSizes().stream().map(sizeDto -> {
+                Sizes size = new Sizes();
+                size.setSizeId(sizeDto.getSizeId());
+                size.setSize(sizeDto.getSize());
+                size.setTotalQuantity(sizeDto.getTotalQuantity());
+                size.setAvailableQuantity(sizeDto.getTotalQuantity());
+                size.setReservedQuantity(0L);
+                size.setSoldQuantity(0L);
+                size.setColors(color);
+                return size;
+            }).toList();
+            color.setSizes(new ArrayList<>(sizes));
+            return color;
         }).toList();
-        if(productIds.size()!=productIds.stream().distinct().toList().size()) throw new BadRequestExceptionClass("duplicate ids are present!");
-        return productIds;
+        entity.setColors(new ArrayList<>(colors));
+        return entity;
     }
 
+    @Transactional
+    @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
+    public void delete(List<Long> ids) {
+        if (ids == null || ids.isEmpty() || ids.stream().anyMatch(id -> id == null || id <= 0))
+            throw new BadRequestExceptionClass("Valid inventory IDs are required!");
+        inventoryRepo.deleteAllById(ids.stream().distinct().toList());
+    }
+
+    @Transactional
+    @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
+    public void reserved(Long orderId, List<InventoryItem> items) {
+        if (orderId == null || orderId <= 0) throw new BadRequestExceptionClass("orderId must be positive!");
+        validateVariantItems(items);
+        List<Long> productIds = items.stream().map(InventoryItem::getProductId).distinct().toList();
+        List<InventoryEntity> inventories = inventoryRepo.findAllByProductIdIn(productIds);
+        if (inventories.size() != productIds.size())
+            throw new BadRequestExceptionClass("One or more inventory records were not found!");
+
+        Map<Long, InventoryEntity> byProductId = inventories.stream().collect(Collectors.toMap(
+                InventoryEntity::getProductId, Function.identity()));
+        for (InventoryItem item : items) {
+            Sizes size = findSize(byProductId.get(item.getProductId()), item.getColor(), item.getSize());
+            long available = available(size);
+            if (item.getQuantities() > available)
+                throw new BadRequestExceptionClass("Insufficient stock for productId: " + item.getProductId()
+                        + ", color: " + item.getColor() + ", size: " + item.getSize());
+            size.setAvailableQuantity(available - item.getQuantities());
+            size.setReservedQuantity(valueOrZero(size.getReservedQuantity()) + item.getQuantities());
+        }
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(15);
+        List<ReservationEntity> reservations = items.stream()
+                .map(item -> new ReservationEntity(orderId, item.getProductId(), item.getSize(), item.getColor(),
+                        item.getQuantities(), Status.RESERVED, expiresAt))
+                .toList();
+        inventoryRepo.saveAll(inventories);
+        reservationRepo.saveAll(reservations);
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = "allInventoryV2", key = "'all'")
+    public List<Inventory> getAllStock() {
+        return toDtos(inventoryRepo.findAll());
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = "inventoryV2", key = "#productId")
+    public Inventory getStock(Long productId) {
+        if (productId == null || productId <= 0) throw new BadRequestExceptionClass("productId must be positive!");
+        InventoryEntity entity = inventoryRepo.findByProductId(productId)
+                .orElseThrow(() -> new BadRequestExceptionClass("Product not found with productId: " + productId));
+        return toDto(entity);
+    }
+
+    @Transactional
+    @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
+    public List<Inventory> updateInventory(List<InventoryItem> items) {
+        validateVariantItems(items);
+        List<Long> productIds = items.stream().map(InventoryItem::getProductId).distinct().toList();
+        List<InventoryEntity> inventories = inventoryRepo.findAllByProductIdIn(productIds);
+        if (inventories.size() != productIds.size())
+            throw new BadRequestExceptionClass("One or more inventory records were not found!");
+        Map<Long, InventoryEntity> byProductId = inventories.stream().collect(Collectors.toMap(
+                InventoryEntity::getProductId, Function.identity()));
+        for (InventoryItem item : items) {
+            Sizes size = findSize(byProductId.get(item.getProductId()), item.getColor(), item.getSize());
+            size.setTotalQuantity(valueOrZero(size.getTotalQuantity()) + item.getQuantities());
+            size.setAvailableQuantity(available(size) + item.getQuantities());
+        }
+        inventoryRepo.saveAll(inventories);
+        return inventories.stream().map(this::toDto).toList();
+    }
+
+    private void validateVariantItems(List<InventoryItem> items) {
+        if (items == null || items.isEmpty()) throw new BadRequestExceptionClass("Inventory items are required!");
+        for (InventoryItem item : items) {
+            if (item == null || item.getProductId() == null || item.getProductId() <= 0)
+                throw new BadRequestExceptionClass("productId must be positive!");
+            if (item.getQuantities() == null || item.getQuantities() <= 0)
+                throw new BadRequestExceptionClass("quantities must be positive!");
+            if (item.getColor() == null || item.getColor().isBlank())
+                throw new BadRequestExceptionClass("Color is required!");
+            if (item.getSize() == null || item.getSize().isBlank())
+                throw new BadRequestExceptionClass("Size is required!");
+        }
+    }
+
+    private Sizes findSize(InventoryEntity inventory, String colorName, String sizeName) {
+        if (inventory.getColors() == null) throw new BadRequestExceptionClass("No colors found for product!");
+        Colors color = inventory.getColors().stream()
+                .filter(candidate -> candidate.getColor() != null
+                        && candidate.getColor().equalsIgnoreCase(colorName))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestExceptionClass("Color not found: " + colorName));
+        if (color.getSizes() == null) throw new BadRequestExceptionClass("No sizes found for color: " + colorName);
+        return color.getSizes().stream()
+                .filter(candidate -> candidate.getSize() != null
+                        && candidate.getSize().equalsIgnoreCase(sizeName))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestExceptionClass("Size not found: " + sizeName));
+    }
+
+    @Transactional(readOnly = true)
     public List<ReservationEntity> getReservedRecords() {
         return reservationRepo.findByStatus(Status.RESERVED);
     }
+
+    @Transactional(readOnly = true)
     public List<ReservationEntity> getReleasedRecords() {
         return reservationRepo.findByStatus(Status.RELEASED);
     }
+
+    @Transactional(readOnly = true)
     public List<ReservationEntity> getConfirmedRecords() {
         return reservationRepo.findByStatus(Status.CONFIRM);
     }
@@ -170,23 +269,33 @@ public class InventoryService {
     @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
     public void release(Long orderId) {
         List<ReservationEntity> reservations = activeReservations(orderId, Status.RELEASED);
-        if (reservations.isEmpty()) return;
-        releaseActiveReservations(orderId, reservations);
+        if (!reservations.isEmpty()) releaseReservations(orderId, reservations, false);
     }
 
     @Transactional
     @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
     public void confirm(Long orderId) {
         List<ReservationEntity> reservations = activeReservations(orderId, Status.CONFIRM);
-        if (reservations.isEmpty()) return;
+        if (!reservations.isEmpty()) releaseReservations(orderId, reservations, true);
+    }
+
+    private void releaseReservations(Long orderId, List<ReservationEntity> reservations, boolean confirmed) {
         Map<Long, InventoryEntity> inventories = loadReservedInventories(orderId, reservations);
         for (ReservationEntity reservation : reservations) {
             InventoryEntity inventory = inventories.get(reservation.getProductId());
-            long reserved = inventory.getReservedQuantity() == null ? 0 : inventory.getReservedQuantity();
-            if (reserved < reservation.getQuantities()) throw new BadRequestExceptionClass("Reserved quantity is inconsistent for productId: " + reservation.getProductId());
-            inventory.setReservedQuantity(reserved - reservation.getQuantities());
-            inventory.setSoldQuantity((inventory.getSoldQuantity() == null ? 0 : inventory.getSoldQuantity()) + reservation.getQuantities());
-            reservation.setStatus(Status.CONFIRM);
+            Sizes size = findSize(inventory, reservation.getColor(), reservation.getSize());
+            long reserved = valueOrZero(size.getReservedQuantity());
+            if (reserved < reservation.getQuantities())
+                throw new BadRequestExceptionClass("Reserved stock is inconsistent for productId: "
+                        + reservation.getProductId());
+            size.setReservedQuantity(reserved - reservation.getQuantities());
+            if (confirmed) {
+                size.setSoldQuantity(valueOrZero(size.getSoldQuantity()) + reservation.getQuantities());
+                reservation.setStatus(Status.CONFIRM);
+            } else {
+                size.setAvailableQuantity(available(size) + reservation.getQuantities());
+                reservation.setStatus(Status.RELEASED);
+            }
         }
         inventoryRepo.saveAll(inventories.values());
         reservationRepo.saveAll(reservations);
@@ -196,19 +305,20 @@ public class InventoryService {
     @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
     public void markPaymentStarted(Long orderId) {
         List<ReservationEntity> reservations = activeReservations(orderId, Status.CONFIRM);
-        if (reservations.isEmpty()) throw new BadRequestExceptionClass("No active reservation found for orderId: " + orderId);
+        if (reservations.isEmpty())
+            throw new BadRequestExceptionClass("No active reservation found for orderId: " + orderId);
         LocalDateTime now = LocalDateTime.now();
-        if (reservations.stream().anyMatch(reservation -> reservation.getExpiredAt() == null || !reservation.getExpiredAt().isAfter(now)))
+        if (reservations.stream().anyMatch(reservation -> reservation.getExpiredAt() == null
+                || !reservation.getExpiredAt().isAfter(now)))
             throw new BadRequestExceptionClass("Reservation has expired for orderId: " + orderId);
         reservations.forEach(reservation -> reservation.setPaymentStarted(true));
         reservationRepo.saveAll(reservations);
-        log.info("Payment Started..");
     }
 
     @Transactional
     @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
     public void clearPaymentStarted(Long orderId) {
-        if (orderId == null || orderId <= 0) throw new BadRequestExceptionClass("orderId must be valid!");
+        if (orderId == null || orderId <= 0) throw new BadRequestExceptionClass("orderId must be positive!");
         List<ReservationEntity> reservations = reservationRepo.findByOrderIdAndStatus(orderId, Status.RESERVED);
         reservations.forEach(reservation -> reservation.setPaymentStarted(false));
         reservationRepo.saveAll(reservations);
@@ -218,16 +328,15 @@ public class InventoryService {
     @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
     @Scheduled(fixedDelayString = "${inventory.reservation-expiration-check-ms:30000}")
     public void releaseExpiredReservations() {
-        List<ReservationEntity> expiredReservations = reservationRepo.findExpiredUnpaid(Status.RESERVED, LocalDateTime.now());
-        if (expiredReservations.isEmpty()) return;
-        Map<Long, List<ReservationEntity>> byOrder = expiredReservations.stream()
+        List<ReservationEntity> expired = reservationRepo.findExpiredUnpaid(Status.RESERVED, LocalDateTime.now());
+        if (expired.isEmpty()) return;
+        Map<Long, List<ReservationEntity>> byOrder = expired.stream()
                 .collect(Collectors.groupingBy(ReservationEntity::getOrderId));
-        byOrder.forEach(this::releaseActiveReservations);
-        log.info("Released expired reservations for {} orders", byOrder.size());
+        byOrder.forEach((orderId, orderReservations) -> releaseReservations(orderId, orderReservations, false));
     }
 
     private List<ReservationEntity> activeReservations(Long orderId, Status completedStatus) {
-        if (orderId == null || orderId <= 0) throw new BadRequestExceptionClass("orderId must be valid!");
+        if (orderId == null || orderId <= 0) throw new BadRequestExceptionClass("orderId must be positive!");
         List<ReservationEntity> reservations = reservationRepo.findByOrderIdAndStatus(orderId, Status.RESERVED);
         if (reservations.isEmpty()) {
             if (!reservationRepo.findByOrderIdAndStatus(orderId, completedStatus).isEmpty()) return List.of();
@@ -237,40 +346,84 @@ public class InventoryService {
     }
 
     private Map<Long, InventoryEntity> loadReservedInventories(Long orderId, List<ReservationEntity> reservations) {
-        List<Long> productIds = reservations.stream().map(ReservationEntity::getProductId).toList();
+        List<Long> productIds = reservations.stream().map(ReservationEntity::getProductId).distinct().toList();
         List<InventoryEntity> found = inventoryRepo.findAllByProductIdIn(productIds);
-        if (found.size() != productIds.size()) throw new BadRequestExceptionClass("Inventory records missing for orderId: " + orderId);
-        return found.stream().collect(Collectors.toMap(InventoryEntity::getProductId, inventory -> inventory));
+        if (found.size() != productIds.size())
+            throw new BadRequestExceptionClass("Inventory records missing for orderId: " + orderId);
+        return found.stream().collect(Collectors.toMap(InventoryEntity::getProductId, Function.identity()));
     }
 
-    private long currentAvailableQuantity(InventoryEntity inventory) {
-        if (inventory.getAvailableQuantity() != null) return inventory.getAvailableQuantity();
-        long reserved = inventory.getReservedQuantity() == null ? 0 : inventory.getReservedQuantity();
-        long sold = inventory.getSoldQuantity() == null ? 0 : inventory.getSoldQuantity();
-        return Math.max(0, inventory.getTotalQuantity() - reserved - sold);
+    private List<Inventory> toDtos(List<InventoryEntity> entities) {
+        return entities.stream().map(this::toDto).toList();
     }
 
-    private void releaseActiveReservations(Long orderId, List<ReservationEntity> reservations) {
-        Map<Long, InventoryEntity> inventories = loadReservedInventories(orderId, reservations);
-        for (ReservationEntity reservation : reservations) {
-            InventoryEntity inventory = inventories.get(reservation.getProductId());
-            long reserved = inventory.getReservedQuantity() == null ? 0 : inventory.getReservedQuantity();
-            if (reserved < reservation.getQuantities()) throw new BadRequestExceptionClass("Reserved quantity is inconsistent for productId: " + reservation.getProductId());
-            inventory.setReservedQuantity(reserved - reservation.getQuantities());
-            inventory.setAvailableQuantity(currentAvailableQuantity(inventory) + reservation.getQuantities());
-            reservation.setStatus(Status.RELEASED);
-        }
-        inventoryRepo.saveAll(inventories.values());
-        reservationRepo.saveAll(reservations);
+    private Inventory toDto(InventoryEntity entity) {
+        Inventory dto = new Inventory();
+        dto.setId(entity.getId());
+        dto.setProductId(entity.getProductId());
+        dto.setName(entity.getName());
+        dto.setGender(entity.getGender() == null ? null : entity.getGender().name());
+        dto.setColors(entity.getColors() == null ? List.of() : entity.getColors().stream().map(color -> {
+            ColorDto colorDto = new ColorDto();
+            colorDto.setColorId(color.getId());
+            colorDto.setColor(color.getColor());
+            colorDto.setImages(color.getImages());
+            colorDto.setSizes(color.getSizes() == null ? List.of() : color.getSizes().stream().map(size -> {
+                SizeDto sizeDto = new SizeDto();
+                sizeDto.setSizeId(size.getSizeId());
+                sizeDto.setSize(size.getSize());
+                sizeDto.setTotalQuantity(valueOrZero(size.getTotalQuantity()));
+                sizeDto.setAvailableQuantity(available(size));
+                sizeDto.setReservedQuantity(valueOrZero(size.getReservedQuantity()));
+                sizeDto.setSoldQuantity(valueOrZero(size.getSoldQuantity()));
+                return sizeDto;
+            }).toList());
+            return colorDto;
+        }).toList());
+        return dto;
     }
 
+    @Transactional(readOnly = true)
     public List<Long> maxSold() {
-        List<InventoryEntity> result=inventoryRepo.findAllByOrderBySoldQuantityDesc();
-        return result.stream().map(InventoryEntity::getProductId).toList();
+        return inventoryRepo.findAll().stream()
+                .sorted((first, second) -> Long.compare(totalSold(second), totalSold(first)))
+                .map(InventoryEntity::getProductId)
+                .toList();
     }
 
+    private long totalSold(InventoryEntity inventory) {
+        if (inventory.getColors() == null) return 0;
+        return inventory.getColors().stream()
+                .filter(Objects::nonNull)
+                .flatMap(color -> color.getSizes() == null ? java.util.stream.Stream.empty() : color.getSizes().stream())
+                .filter(Objects::nonNull)
+                .mapToLong(size -> valueOrZero(size.getSoldQuantity()))
+                .sum();
+    }
+
+    private long available(Sizes size) {
+        if (size.getAvailableQuantity() != null) return size.getAvailableQuantity();
+        return Math.max(0, valueOrZero(size.getTotalQuantity())
+                - valueOrZero(size.getReservedQuantity()) - valueOrZero(size.getSoldQuantity()));
+    }
+
+    private long valueOrZero(Long value) {
+        return value == null ? 0 : value;
+    }
+
+    private Gender parseGender(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Gender.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new BadRequestExceptionClass("gender must be MALE, FEMALE, or UNISEX!");
+        }
+    }
+
+    @Transactional
+    @CacheEvict(value = {"allInventoryV2", "inventoryV2"}, allEntries = true)
     public void deleteAll() {
+        reservationRepo.deleteAll();
         inventoryRepo.deleteAll();
-        log.info("Inventory data deleted success");
     }
 }

@@ -11,7 +11,7 @@ public class ItemDto {
     private Long id;
     private Long product_id;
     private String product_name;
-    private int quantities;
+    private Long quantities;
     private double subAmount;
     private double perAmount;
     private String color;

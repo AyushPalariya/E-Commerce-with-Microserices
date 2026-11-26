@@ -13,8 +13,8 @@ public interface OrderClientInterface {
     ResponseEntity<OrderPlace> getOrder(@PathVariable Long orderId, @RequestBody UserDetailsDto userDetails);
 
     @PostMapping("/order/internal/{orderId}/payment-success")
-    void paymentSucceeded(@PathVariable("orderId") Long orderId);
+    ResponseEntity<Void> paymentSucceeded(@PathVariable("orderId") Long orderId);
 
     @PostMapping("/order/internal/{orderId}/payment-failed")
-    void paymentFailed(@PathVariable("orderId") Long orderId);
+    ResponseEntity<Void> paymentFailed(@PathVariable("orderId") Long orderId);
 }

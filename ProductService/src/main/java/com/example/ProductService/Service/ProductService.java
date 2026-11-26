@@ -1,9 +1,13 @@
 package com.example.ProductService.Service;
 
+import com.example.ProductService.Dto.ColorDto;
 import com.example.ProductService.Dto.Product;
+import com.example.ProductService.Dto.SizeDto;
 import com.example.ProductService.Dto.VerifyProduct;
+import com.example.ProductService.Entities.Colors;
 import com.example.ProductService.Entities.Gender;
 import com.example.ProductService.Entities.Products;
+import com.example.ProductService.Entities.Sizes;
 import com.example.ProductService.ExceptionHandle.BadRequestException;
 import com.example.ProductService.ExceptionHandle.ConflictException;
 import com.example.ProductService.ExceptionHandle.ProductIdsNotFound;
@@ -27,11 +31,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -58,19 +58,22 @@ public class ProductService {
         if (products == null || products.isEmpty()) throw new BadRequestException("At least one product is required!");
         List<Products> pp=new ArrayList<>();
         for (Product product : products) {
+            List<ColorDto> colors = product.getColors();
+            if(colors==null||colors.isEmpty()) throw new BadRequestException("Color details should be required!");
+            for(ColorDto colorDto:colors){
+                if(colorDto.getImages()==null||colorDto.getImages().isBlank()) throw new BadRequestException("Image is required for "+product.getName());
+                if(colorDto.getColorOrderSequence()==null||colorDto.getColorOrderSequence()<=0) throw new BadRequestException("Sequence is required for "+product.getName());
+                if(colorDto.getColor()==null||colorDto.getColor().isBlank()) throw new BadRequestException("Color name is Required for "+product.getName());
+                if(colorDto.getSizes().stream().anyMatch(s->s.getAmount()==null||s.getAmount()<=0
+                ||s.getSize()==null||s.getSize().isBlank())) throw new BadRequestException("Required Amount or Size!");
+            }
             if (product == null) throw new BadRequestException("Product details are required!");
-            if (product.getAmount() == null || !Double.isFinite(product.getAmount()) || product.getAmount() < 0)
-                throw new BadRequestException("Amount must be a non-negative number!");
             if (product.getCategory() == null || product.getCategory().isBlank())
                 throw new BadRequestException("category is required!");
             if (product.getDescription() == null || product.getDescription().isBlank())
                 throw new BadRequestException("Description is required!");
             if (product.getName() == null || product.getName().isBlank())
                 throw new BadRequestException("name is required!");
-            if (product.getImg() == null || product.getImg().isBlank())
-                throw new BadRequestException("img is required!");
-            validateOptions(product.getColor(), "color");
-            validateOptions(product.getSize(), "size");
             if (product.getDiscountPercentage() != null
                     && (product.getDiscountPercentage() < 0 || product.getDiscountPercentage() > 100))
                 throw new BadRequestException("Discount percentage must be between 0 and 100!");
@@ -99,41 +102,37 @@ public class ProductService {
     })
     @Transactional
     public Product updateProduct(Long id, Map<String,Object> mp){
+        if (id == null || id <= 0) throw new BadRequestException("Product id must be positive!");
         if (mp == null || mp.isEmpty()) throw new BadRequestException("Product fields are required!");
         Products p= productRepo.findById(id).orElseThrow(()->new ResourceNotFound("Product not found with id: "+id));
         for (Map.Entry<String, Object> entry : mp.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
             switch (key) {
-                case "description" -> p.setDescription((String) value);
-                case "category" -> p.setCategory((String) value);
-                case "img" -> p.setImg((String) value);
-                case "amount" -> p.setAmount(asDouble(value, key));
-                case "name" -> p.setName((String) value);
-                case "size" -> p.setSize(asStringList(value, key));
-                case "color" -> p.setColor(asStringList(value, key));
+                case "description" -> p.setDescription(asRequiredString(value, key));
+                case "category" -> p.setCategory(asRequiredString(value, key));
+                case "name" -> p.setName(asRequiredString(value, key));
+                case "colors" -> replaceColors(p, value);
                 case "gender" -> p.setGender(asGender(value));
-                case "discountPercentage" ->{
+                case "discountPercentage" -> {
                     p.setDiscountPercentage(asLong(value, key));
-                    double disAmount=(p.getAmount()*p.getDiscountPercentage())/100.0;
-                    p.setDiscountAmount(disAmount);
+                    if(p.getDiscountPercentage()>=15) p.setOnSale(true);
+                    else p.setOnSale(false);
                 }
                 case "avgRating" -> p.setAvgRating(asDouble(value, key));
                 default -> throw new BadRequestException("Unsupported product field: " + key);
             }
         }
-        if (p.getAmount() == null || !Double.isFinite(p.getAmount()) || p.getAmount() < 0)
-            throw new BadRequestException("Amount must be a non-negative number!");
         if (p.getCategory() == null || p.getCategory().isBlank()
                 || p.getDescription() == null || p.getDescription().isBlank()
-                || p.getName() == null || p.getName().isBlank()
-                || p.getImg() == null || p.getImg().isBlank())
-            throw new BadRequestException("Category, description, name, and image are required!");
-        validateOptions(p.getColor(), "color");
-        validateOptions(p.getSize(), "size");
+                || p.getName() == null || p.getName().isBlank())
+            throw new BadRequestException("Category, description, and name are required!");
+
         if (p.getDiscountPercentage() != null
                 && (p.getDiscountPercentage() < 0 || p.getDiscountPercentage() > 100))
             throw new BadRequestException("Discount percentage must be between 0 and 100!");
+        if (p.getAvgRating() != null && (!Double.isFinite(p.getAvgRating()) || p.getAvgRating() < 0))
+            throw new BadRequestException("Average rating must be a non-negative number!");
         p=productRepo.save(p);
         return toDto(p);
     }
@@ -244,15 +243,35 @@ public class ProductService {
         product.setId(p.getId());
         product.setCategory(p.getCategory());
         product.setDescription(p.getDescription());
-        product.setImg(p.getImg());
-        product.setAmount(p.getAmount());
         product.setName(p.getName());
-        product.setColor(p.getColor());
-        product.setSize(p.getSize());
         product.setAvgRating(p.getAvgRating());
-        product.setGender(p.getGender());
+        product.setGender(String.valueOf(p.getGender()));
         product.setDiscountPercentage(p.getDiscountPercentage());
-        product.setDiscountAmount(p.getDiscountAmount());
+        product.setOnSale(p.getOnSale());
+
+        List<ColorDto> colors = p.getColors() == null
+                ? new ArrayList<>()
+                : p.getColors().stream().map(color -> {
+                    ColorDto colorDto = new ColorDto();
+                    colorDto.setColorId(color.getId());
+                    colorDto.setColor(color.getColor());
+                    colorDto.setColorOrderSequence(color.getColorOrderSequence());
+                    colorDto.setImages(color.getImages());
+
+                    List<SizeDto> sizes = color.getSizes() == null
+                            ? new ArrayList<>()
+                            : color.getSizes().stream().map(size -> {
+                                SizeDto sizeDto = new SizeDto();
+                                sizeDto.setSizeId(size.getId());
+                                sizeDto.setSize(size.getSize());
+                                sizeDto.setAmount(size.getAmount());
+                                return sizeDto;
+                            }).toList();
+                    colorDto.setSizes(sizes);
+                    return colorDto;
+                }).toList();
+        product.setColors(colors);
+
         return product;
     }
 
@@ -260,25 +279,96 @@ public class ProductService {
         Products entity = new Products();
         entity.setCategory(product.getCategory());
         entity.setDescription(product.getDescription());
-        entity.setImg(product.getImg());
-        double amount=product.getAmount();
-        entity.setAmount(amount);
         entity.setName(product.getName());
-        entity.setColor(product.getColor());
-        entity.setSize(product.getSize());
         entity.setAvgRating(product.getAvgRating());
-        entity.setGender(product.getGender());
+        entity.setGender(Gender.valueOf(product.getGender()));
         Long disPer=product.getDiscountPercentage();
         entity.setDiscountPercentage(disPer);
-        double disAmount=(disPer*amount)/100.0;
-        entity.setDiscountAmount(disAmount);
+        entity.setOnSale(disPer >= 15);
+        List<Colors> colors = new ArrayList<>();
+        for(ColorDto cd:product.getColors()){
+            Colors cc=new Colors();
+            cc.setColorOrderSequence(cd.getColorOrderSequence());
+            cc.setImages(cd.getImages());
+            cc.setColor(cd.getColor());
+            List<Sizes> sizes=new ArrayList<>();
+            for(SizeDto sd:cd.getSizes()){
+                 Sizes ss=new Sizes();
+                 ss.setAmount(sd.getAmount());
+                 ss.setSize(sd.getSize());
+                 ss.setColors(cc);
+                 sizes.add(ss);
+            }
+            cc.setProducts(entity);
+            cc.setSizes(sizes);
+            colors.add(cc);
+        }
+        entity.setColors(colors);
         return entity;
     }
 
-    private void validateOptions(List<String> options, String field) {
-        if (options == null || options.isEmpty()
-                || options.stream().anyMatch(option -> option == null || option.isBlank()))
-            throw new BadRequestException(field + " must contain at least one non-blank value!");
+
+
+    private String asRequiredString(Object value, String field) {
+        if (!(value instanceof String text) || text.isBlank())
+            throw new BadRequestException(field + " must be a non-blank string!");
+        return text;
+    }
+
+    private List<Colors> asColors(Object value, Products product) {
+        if (!(value instanceof List<?> values))
+            throw new BadRequestException("colors must be a list!");
+
+        List<Colors> colors = new ArrayList<>();
+        for (Object item : values) {
+            if (!(item instanceof Map<?, ?> colorData))
+                throw new BadRequestException("Each color must be an object!");
+
+            Colors color = new Colors();
+            color.setColor(asRequiredString(colorData.get("color"), "color"));
+            color.setImages(asRequiredString(colorData.get("images"), "images"));
+            Long sequence = asLong(colorData.get("colorOrderSequence"), "colorOrderSequence");
+            if (sequence == null || sequence <= 0)
+                throw new BadRequestException("colorOrderSequence must be positive!");
+            color.setColorOrderSequence(sequence);
+            color.setProducts(product);
+
+            Object sizesValue = colorData.get("sizes");
+            if (!(sizesValue instanceof List<?> sizeValues) || sizeValues.isEmpty())
+                throw new BadRequestException("Each color must have at least one size!");
+            List<Sizes> sizes = new ArrayList<>();
+            for (Object sizeItem : sizeValues) {
+                if (!(sizeItem instanceof Map<?, ?> sizeData))
+                    throw new BadRequestException("Each size must be an object!");
+                Sizes size = new Sizes();
+                size.setSize(asRequiredString(sizeData.get("size"), "size"));
+                Double amount = asDouble(sizeData.get("amount"), "amount");
+                if (amount == null || !Double.isFinite(amount) || amount <= 0)
+                    throw new BadRequestException("Size amount must be a positive number!");
+                size.setAmount(amount);
+                size.setColors(color);
+                sizes.add(size);
+            }
+            color.setSizes(sizes);
+            colors.add(color);
+        }
+        return colors;
+    }
+
+    private void replaceColors(Products product, Object value) {
+        List<Colors> colors = asColors(value, product);
+        if (product.getColors() == null) {
+            product.setColors(colors);
+        } else {
+            product.getColors().clear();
+            product.getColors().addAll(colors);
+        }
+    }
+
+    private Boolean asBoolean(Object value, String field) {
+        if (!(value instanceof Boolean booleanValue))
+            throw new BadRequestException(field + " must be true or false!");
+        return booleanValue;
     }
 
     private List<String> asStringList(Object value, String field) {

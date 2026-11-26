@@ -17,6 +17,8 @@ public class ReservationEntity {
     private Long id;
     private Long orderId;
     private Long productId;
+    private String size;
+    private String color;
     private Long quantities;
     @Enumerated(EnumType.STRING)
     private Status status;
@@ -30,5 +32,12 @@ public class ReservationEntity {
         this.status=status;
         this.expiredAt=expiredAt;
         this.paymentStarted=false;
+    }
+
+    public ReservationEntity(Long orderId, Long productId, String size, String color,
+                             Long quantities, Status status, LocalDateTime expiredAt) {
+        this(orderId, productId, quantities, status, expiredAt);
+        this.size = size;
+        this.color = color;
     }
 }

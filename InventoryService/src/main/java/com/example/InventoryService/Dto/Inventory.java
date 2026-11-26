@@ -1,15 +1,15 @@
 package com.example.InventoryService.Dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-
 public class Inventory implements Serializable {
     //include all in response when getAllStock of productId
     private Long id;//include in response
@@ -17,18 +17,7 @@ public class Inventory implements Serializable {
     //include in request when getStock upto productId
     private String name;
     private Long productId;
-    private Long totalQuantity;
+    private String gender;
+    private List<ColorDto> colors;
 
-    private Long availableQuantity;
-    private Long reservedQuantity;
-    private Long soldQuantity;
-
-    //adding response
-    public Inventory(Long id, String name, Long productId, Long totalQuantity,Long ava) {
-        this.id = id;
-        this.name = name;
-        this.productId = productId;
-        this.totalQuantity = totalQuantity;
-        this.availableQuantity=ava;
-    }
 }

@@ -11,4 +11,6 @@ public class InventoryItem {
 
     private Long productId;
     private Long quantities;
+    private String size;
+    private String color;
 }

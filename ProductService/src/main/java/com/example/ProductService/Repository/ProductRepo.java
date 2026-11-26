@@ -1,6 +1,7 @@
 package com.example.ProductService.Repository;
 
 import com.example.ProductService.Dto.VerifyProduct;
+import com.example.ProductService.Entities.Gender;
 import com.example.ProductService.Entities.Products;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,4 +39,8 @@ public interface ProductRepo extends JpaRepository<Products,Long> {
     Page<Products> findAllByIdIn(List<Long> productIdsWithMaxSold, Pageable pageable);
 
     Page<Products> findAllByCategoryIgnoreCase(String category, Pageable pageable);
+
+    Page<Products> findAllByGender(Gender gender, Pageable pageable);
+
+    Page<Products> findAllByOnSaleTrue(Pageable pageable);
 }

@@ -1,11 +1,14 @@
 package com.example.ProductService.Dto;
 
+import com.example.ProductService.Entities.Colors;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import com.example.ProductService.Entities.Gender;
 
@@ -13,16 +16,13 @@ import com.example.ProductService.Entities.Gender;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Product implements Serializable {
-    private Long id;//include in response
+    private Long id;//include in response not in request
     private String category;
     private String description;
-    private String img;
-    private Double amount;
     private String name;
-    private List<String> color;
-    private List<String> size;
+    private List<ColorDto> colors;
     private Double avgRating;
-    private Gender gender;
+    private String gender;
     private Long discountPercentage;
-    private Double discountAmount;//not include in coming request
+    private Boolean onSale;//not include in request
 }

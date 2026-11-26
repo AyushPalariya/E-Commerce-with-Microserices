@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -21,27 +22,17 @@ public class Products implements Serializable {
     private Long id;
     private String category;
     private String description;
-    private String img;
-    private Double amount;
     private String name;
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "product_colors", joinColumns = @JoinColumn(name = "product_id"))
-    @Column(name = "color", nullable = false)
-    @OrderColumn(name = "color_order")
-    private List<String> color;
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "product_sizes", joinColumns = @JoinColumn(name = "product_id"))
-    @Column(name = "size", nullable = false)
-    @OrderColumn(name = "size_order")
-    private List<String> size;
+    @OneToMany(mappedBy = "products", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Colors> colors;
     private Double avgRating;
     @Enumerated(value = EnumType.STRING)
     private Gender gender;
     private Long discountPercentage;
-    private Double discountAmount;
     @CreationTimestamp
     private LocalDateTime created;
     @UpdateTimestamp 
     private LocalDateTime updated;
+    private Boolean onSale;
 
 }

@@ -59,7 +59,7 @@ public class OrderService {
             System.out.print(p.getId()+" ");
             productMap.put(p.getId(),p);
         }
-        System.out.println(productMap);
+        log.info("ProductMap :{}",productMap);
 
 
         OrderEntity order = new OrderEntity();
@@ -74,9 +74,8 @@ public class OrderService {
         for (ItemDto itemDto : orderPlace.getItems()) {
             ProductDto product=productMap.get(itemDto.getProduct_id());
             if (product == null) throw new BadRequestException("Product not found: " + itemDto.getProduct_id());
-            validateVariant(itemDto.getColor(), product.getColor(), "color", product);
-            validateVariant(itemDto.getSize(), product.getSize(), "size", product);
-            BigDecimal unitPrice = discountedUnitPrice(product);
+            ProductSizeDto selectedSize = findSelectedSize(product, itemDto.getColor(), itemDto.getSize());
+            BigDecimal unitPrice = discountedUnitPrice(product, selectedSize);
             BigDecimal subtotal = unitPrice
                     .multiply(BigDecimal.valueOf(itemDto.getQuantities()))
                     .setScale(2, RoundingMode.HALF_UP);
@@ -97,7 +96,7 @@ public class OrderService {
         order.setTotalAmount(totalAmount.doubleValue());
 
         OrderEntity save = orderRepo.save(order);
-        List<InventoryItem> inv=new ArrayList<>();
+        List<InventoryItem> inv = new ArrayList<>();
         List<ItemDto> itemDto=save.getItems().stream().map(item -> {
             ItemDto savedItem = new ItemDto();
             savedItem.setId(item.getId());
@@ -108,8 +107,7 @@ public class OrderService {
             savedItem.setPerAmount(item.getPerAmount());
             savedItem.setColor(item.getColor());
             savedItem.setSize(item.getSize());
-            InventoryItem inventoryItem=new InventoryItem(item.getProduct_id(),item.getQuantities());
-            inv.add(inventoryItem);
+            inv.add(new InventoryItem(item.getProduct_id(), item.getQuantities(), item.getSize(), item.getColor()));
             return savedItem;
         }).toList();
         try {
@@ -165,38 +163,45 @@ public class OrderService {
             if (item == null) throw new BadRequestException("Order item details are required!");
             if (item.getProduct_id() == null || item.getProduct_id() <= 0)
                 throw new BadRequestException("Each order item must have a positive product id!");
-            if (item.getQuantities() <= 0)
+            if (item.getQuantities() == null || item.getQuantities() <= 0)
                 throw new BadRequestException("Each order item quantity must be positive!");
             if (item.getColor() == null || item.getColor().isBlank())
                 throw new BadRequestException("Each order item must include a color!");
             if (item.getSize() == null || item.getSize().isBlank())
                 throw new BadRequestException("Each order item must include a size!");
+            item.setColor(item.getColor().trim());
+            item.setSize(item.getSize().trim());
         }
     }
 
-    private void validateVariant(String selected, List<String> available, String field, ProductDto product) {
-        if (available == null || !available.contains(selected)) {
-            throw new BadRequestException("Selected " + field + " is unavailable for product: " + product.getId());
+    private ProductSizeDto findSelectedSize(ProductDto product, String selectedColor, String selectedSize) {
+        if (product.getColors() == null) {
+            throw new BadRequestException("Product has no available colors: " + product.getId());
         }
+        ProductColorDto color = product.getColors().stream()
+                .filter(candidate -> candidate != null && candidate.getColor() != null
+                        && candidate.getColor().trim().equalsIgnoreCase(selectedColor.trim()))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException(
+                        "Selected color is unavailable for product: " + product.getId()));
+        if (color.getSizes() == null) {
+            throw new BadRequestException("Selected color has no available sizes for product: " + product.getId());
+        }
+        return color.getSizes().stream()
+                .filter(size -> size != null && size.getSize() != null
+                        && size.getSize().trim().equalsIgnoreCase(selectedSize.trim()))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException(
+                        "Selected size is unavailable for product color: " + product.getId()));
     }
 
-    private BigDecimal discountedUnitPrice(ProductDto product) {
-        Double amount = product.getAmount();
-        if (amount == null || !Double.isFinite(amount) || amount < 0) {
-            throw new BadRequestException("Product has an invalid price: " + product.getId());
+    private BigDecimal discountedUnitPrice(ProductDto product, ProductSizeDto selectedSize) {
+        Double amount = selectedSize.getAmount();
+        if (amount == null || !Double.isFinite(amount) || amount <= 0) {
+            throw new BadRequestException("Product size has an invalid price: " + product.getId());
         }
 
         BigDecimal listedPrice = BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP);
-        Double discountAmount = product.getDiscountAmount();
-        if (discountAmount != null) {
-            if (!Double.isFinite(discountAmount) || discountAmount < 0
-                    || BigDecimal.valueOf(discountAmount).compareTo(listedPrice) > 0) {
-                throw new BadRequestException("Product has an invalid discount amount: " + product.getId());
-            }
-            return listedPrice.subtract(BigDecimal.valueOf(discountAmount)
-                    .setScale(2, RoundingMode.HALF_UP));
-        }
-
         Long discountPercentage = product.getDiscountPercentage();
         if (discountPercentage == null) return listedPrice;
         if (discountPercentage < 0 || discountPercentage > 100) {
@@ -232,29 +237,43 @@ public class OrderService {
         OrderEntity orderEntity = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found! "));
         if(!orderEntity.getUserId().equals(user.getUserId())) throw new BadRequestException("userId "+user.getUserId()+" is not matches with orderEntity userId !");
         if(!orderEntity.getUserEmail().equals(user.getEmail())) throw new BadRequestException("email "+user.getEmail()+" is not matches with orderEntity email!");
-        if(Status.PAYMENT_PENDING!=orderEntity.getStatus()) throw new BadRequestException("status is not matches with orderEntity status!");
+        if (orderEntity.getStatus() != Status.PAYMENT_PENDING && orderEntity.getStatus() != Status.PAYMENT_FAILED) {
+            throw new BadRequestException("status is not matches with orderEntity status!");
+        }
         List<OrderPlace> orderPlaces = convertInDto(List.of(orderEntity));
         System.out.println("Payment want this order: "+orderPlaces);
         return orderPlaces.get(0);
     }
 
     @Transactional
-    @CacheEvict(value = "userOrder", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "userOrder", allEntries = true),
+            @CacheEvict(value = "allOrders", allEntries = true)
+    })
     public void paymentSucceeded(Long orderId) {
         OrderEntity order = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found!"));
         if (order.getStatus() == Status.PAID) return;
-        if (order.getStatus() != Status.PAYMENT_PENDING) throw new BadRequestException("Order is not awaiting payment!");
+        if (order.getStatus() != Status.PAYMENT_PENDING && order.getStatus() != Status.PAYMENT_FAILED) {
+            throw new BadRequestException("Order is not awaiting payment!");
+        }
         inventoryClient.confirm(orderId);
         orderRepo.updateStatus(orderId, Status.PAID);
+        order.setStatus(Status.PAID);
     }
 
     @Transactional
-    @CacheEvict(value = "userOrder", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "userOrder", allEntries = true),
+            @CacheEvict(value = "allOrders", allEntries = true)
+    })
     public void paymentFailed(Long orderId) {
         OrderEntity order = orderRepo.findById(orderId).orElseThrow(() -> new BadRequestException("orderId " + orderId + " not found!"));
-        if (order.getStatus() == Status.CANCELLED) return;
-        if (order.getStatus() != Status.PAYMENT_PENDING) throw new BadRequestException("Order is not awaiting payment!");
+        if (order.getStatus() == Status.PAYMENT_FAILED) return;
+        if (order.getStatus() != Status.PAYMENT_PENDING && order.getStatus() != Status.CANCELLED) {
+            throw new BadRequestException("Order is not awaiting payment!");
+        }
         inventoryClient.clearPaymentStarted(orderId);
-        orderRepo.updateStatus(orderId, Status.CANCELLED);
+        orderRepo.updateStatus(orderId, Status.PAYMENT_FAILED);
+        order.setStatus(Status.PAYMENT_FAILED);
     }
 }

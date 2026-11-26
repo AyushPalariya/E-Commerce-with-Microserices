@@ -1,7 +1,10 @@
 package com.example.ProductService.Service;
 
+import com.example.ProductService.Dto.ColorDto;
 import com.example.ProductService.Dto.Product;
+import com.example.ProductService.Dto.SizeDto;
 import com.example.ProductService.Entities.Products;
+import com.example.ProductService.Entities.Gender;
 import com.example.ProductService.ExceptionHandle.BadRequestException;
 import com.example.ProductService.ExceptionHandle.ProductIdsNotFound;
 import com.example.ProductService.Repository.InventoryFeign;
@@ -34,17 +37,31 @@ public class HomeService {
     @Transactional(readOnly = true)
     @Cacheable(
             value = "newProducts",
-            key = "#page + '-' + T(java.lang.Math).min(#size, 14)"
+            key = "#page + '-' + T(java.lang.Math).min(#size, 12)"
     )
     public Page<Product> newProducts(int page, int size) {
         if (page < 0 || size <= 0) {
             throw new BadRequestException("Invalid pagination parameters!");
         }
-        size=Math.min(size,14);
+        size=Math.min(size,12);
         Pageable pageable=PageRequest.of(page,size);
         Page<Products> result=productRepo.findAllByOrderByCreatedDesc(pageable);
         if(result.isEmpty()||page>=result.getTotalPages())  throw new BadRequestException("Page does not exist!");
 
+        return result.map(this::toDto);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Product> saleProducts(int page, int size) {
+        if (page < 0 || size <= 0) {
+            throw new BadRequestException("Invalid pagination parameters!");
+        }
+        size = Math.min(size, 12);
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Products> result = productRepo.findAllByOnSaleTrue(pageable);
+        if (result.isEmpty() || page >= result.getTotalPages()) {
+            throw new BadRequestException("Page does not exist!");
+        }
         return result.map(this::toDto);
     }
 
@@ -54,7 +71,7 @@ public class HomeService {
     }
     @Cacheable(
             value = "trending",
-            key = "#page + '-' + T(java.lang.Math).min(#size, 14)"
+            key = "#page + '-' + T(java.lang.Math).min(#size, 12)"
     )
     @Transactional(readOnly = true)
     public Page<Product> trending(int page, int size) {
@@ -65,7 +82,7 @@ public class HomeService {
             );
         }
 
-        size = Math.min(size, 14);
+        size = Math.min(size, 12);
         Pageable pageable = PageRequest.of(page, size);
 
         List<Long> ids = inventoryFeign.getProductIdsWithMaxSold().getBody();
@@ -103,31 +120,69 @@ public class HomeService {
         product.setId(p.getId());
         product.setCategory(p.getCategory());
         product.setDescription(p.getDescription());
-        product.setImg(p.getImg());
-        product.setAmount(p.getAmount());
         product.setName(p.getName());
-        product.setColor(p.getColor());
-        product.setSize(p.getSize());
         product.setAvgRating(p.getAvgRating());
-        product.setGender(p.getGender());
+        product.setGender(p.getGender().name());
         product.setDiscountPercentage(p.getDiscountPercentage());
-        product.setDiscountAmount(p.getDiscountAmount());
+        product.setOnSale(p.getOnSale());
+
+        List<ColorDto> colors = p.getColors() == null
+                ? new ArrayList<>()
+                : p.getColors().stream().map(color -> {
+            ColorDto colorDto = new ColorDto();
+            colorDto.setColorId(color.getId());
+            colorDto.setColor(color.getColor());
+            colorDto.setColorOrderSequence(color.getColorOrderSequence());
+            colorDto.setImages(color.getImages());
+
+            List<SizeDto> sizes = color.getSizes() == null
+                    ? new ArrayList<>()
+                    : color.getSizes().stream().map(size -> {
+                SizeDto sizeDto = new SizeDto();
+                sizeDto.setSizeId(size.getId());
+                sizeDto.setSize(size.getSize());
+                sizeDto.setAmount(size.getAmount());
+                return sizeDto;
+            }).toList();
+            colorDto.setSizes(sizes);
+            return colorDto;
+        }).toList();
+        product.setColors(colors);
+
         return product;
     }
     @Transactional
     @Cacheable(
             value = "categoryProducts",
-            key = "#category.toLowerCase() + '-' + #page + '-' + T(java.lang.Math).min(#size, 14)"
+            key = "#category.toLowerCase() + '-' + #page + '-' + T(java.lang.Math).min(#size, 12)"
     )
     public Page<Product> getCategoriesProducts(String category,int page,int size) {
         if(category==null||category.isBlank()) throw new BadRequestException("Please provide category name!");
         if (page < 0 || size <= 0) {
             throw new BadRequestException("Invalid pagination parameters!");
         }
-        size=Math.min(size,14);
+        size=Math.min(size,12);
         Pageable pageable=PageRequest.of(page,size);
         Page<Products> result=productRepo.findAllByCategoryIgnoreCase(category,pageable);
         if(result.isEmpty()||page>=result.getTotalPages()) throw new BadRequestException("Page does not exist!");
+        return result.map(this::toDto);
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(
+            value = "categoryProducts",
+            key = "'gender-' + #gender.name() + '-' + #page + '-' + T(java.lang.Math).min(#size, 12)"
+    )
+    public Page<Product> getGenderProducts(Gender gender, int page, int size) {
+        if (gender == null) throw new BadRequestException("Please provide a gender!");
+        if (page < 0 || size <= 0) throw new BadRequestException("Invalid pagination parameters!");
+
+        size = Math.min(size, 12);
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Products> result = productRepo.findAllByGender(gender, pageable);
+        if (result.isEmpty() || page >= result.getTotalPages()) {
+            throw new BadRequestException("Page does not exist!");
+        }
         return result.map(this::toDto);
     }
 
